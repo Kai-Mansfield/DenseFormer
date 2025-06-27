@@ -33,7 +33,9 @@ def get_openwebtext2_data(config):
     """
     if not os.path.exists(os.path.join(OWT2_DATA_PATH, 'train.bin')):
         os.makedirs(OWT2_DATA_PATH, exist_ok=True)
-        dataset = load_dataset("segyges/OpenWebText2")
+        data_dir = "/its/home/kajm20/.cache/huggingface/datasets/downloads/extracted/d836b258ee790398d834915c12be9df4b69c366a5cafc1b19bc7fbd4360746ff"
+        data_files = [os.path.join(data_dir, f) for f in os.listdir(data_dir) if f.endswith(".jsonl")]
+        dataset = load_dataset("json", data_files=data_files)
 
         split_dataset = dataset["train"].train_test_split(test_size=0.0005, seed=2357, shuffle=True)
         split_dataset['val'] = split_dataset.pop('test')
