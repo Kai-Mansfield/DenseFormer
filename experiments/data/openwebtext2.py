@@ -28,7 +28,7 @@ def prepare_openwebtext2_data(config):
     pass
 
 def data_generator():
-    for filename in sorted(glob.glob("/its/home/kajm20/.cache/huggingface/datasets/downloads/extracted/d836b*/**/*.jsonl", recursive=True)):
+    for filename in sorted(glob.glob("/mnt/lustre/scratch/inf/.cache/huggingface/datasets/downloads/extracted/d836b*/**/*.jsonl", recursive=True)):
         with open(filename, "r", encoding="utf-8") as f:
             for line in f:
                 try:
