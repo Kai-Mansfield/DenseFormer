@@ -33,8 +33,7 @@ def get_openwebtext2_data(config):
     """
     if not os.path.exists(os.path.join(OWT2_DATA_PATH, 'train.bin')):
         os.makedirs(OWT2_DATA_PATH, exist_ok=True)
-        dataset = load_dataset("the_pile")
-        dataset = dataset.filter(lambda x: x["meta"]["pile_set_name"] == "OpenWebText2")
+        dataset = load_dataset("segyges/OpenWebText2")
 
         split_dataset = dataset["train"].train_test_split(test_size=0.0005, seed=2357, shuffle=True)
         split_dataset['val'] = split_dataset.pop('test')
