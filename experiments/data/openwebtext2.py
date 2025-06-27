@@ -16,8 +16,9 @@ import os
 from tqdm import tqdm
 import numpy as np
 import tiktoken
-from datasets import load_dataset 
-
+from datasets import load_dataset, Dataset
+import glob
+import json 
 
 OWT2_DATA_PATH = os.path.join(os.path.dirname(__file__), "datasets/openwebtext2/")
 tknzr = tiktoken.get_encoding("gpt2")
@@ -26,6 +27,14 @@ tknzr = tiktoken.get_encoding("gpt2")
 def prepare_openwebtext2_data(config):
     pass
 
+def data_generator():
+    for filename in sorted(glob.glob("/its/home/kajm20/.cache/huggingface/datasets/downloads/extracted/d836b*/**/*.jsonl", recursive=True)):
+        with open(filename, "r", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    yield json.loads(line)
+                except json.JSONDecodeError:
+                    continue  # skip malformed lines
 
 def get_openwebtext2_data(config):
     num_proc=40
@@ -33,9 +42,7 @@ def get_openwebtext2_data(config):
     """
     if not os.path.exists(os.path.join(OWT2_DATA_PATH, 'train.bin')):
         os.makedirs(OWT2_DATA_PATH, exist_ok=True)
-        data_dir = "/its/home/kajm20/.cache/huggingface/datasets/downloads/extracted/d836b258ee790398d834915c12be9df4b69c366a5cafc1b19bc7fbd4360746ff"
-        data_files = [os.path.join(data_dir, f) for f in os.listdir(data_dir) if f.endswith(".jsonl")]
-        dataset = load_dataset("json", data_files=data_files)
+        dataset = Dataset.from_generator(data_generator)
 
         split_dataset = dataset["train"].train_test_split(test_size=0.0005, seed=2357, shuffle=True)
         split_dataset['val'] = split_dataset.pop('test')
