@@ -44,7 +44,7 @@ def get_openwebtext2_data(config):
         os.makedirs(OWT2_DATA_PATH, exist_ok=True)
         dataset = Dataset.from_generator(data_generator)
 
-        split_dataset = dataset["train"].train_test_split(test_size=0.0005, seed=2357, shuffle=True)
+        split_dataset = dataset.train_test_split(test_size=0.0005, seed=2357, shuffle=True)
         split_dataset['val'] = split_dataset.pop('test')
         
         def process(example):
