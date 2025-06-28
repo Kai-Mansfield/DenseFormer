@@ -26,6 +26,13 @@ from .utils import eval, get_batch, save_checkpoint
 
 
 def train_base(model, optimizer, data, scheduler, iterations, acc_steps, batch_size, seq_len, eval_freq, distributed_backend, ckpt_path, extra_args):
+    try:
+        rank = distributed_backend.get_rank()
+    except AttributeError:
+        # single‐GPU or DataParallel path: treat as rank 0
+        rank = 0
+
+    print(f"[Rank {rank}] Entered train_base")
     sys.stdout.flush()
     device_type = 'cuda' if 'cuda' in str(extra_args.device) else 'cpu'
     type_ctx = nullcontext() if device_type == 'cpu' else torch.amp.autocast(
