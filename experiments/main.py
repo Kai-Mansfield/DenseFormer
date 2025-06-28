@@ -44,7 +44,8 @@ def get_args():
     parser.add_argument('--config_format', default='base', choices=config.registered_formats())
     parser.add_argument('--train_start_index', type=int, default=0,
                     help='Starting index in the training data')
-
+    parser.add_argument('--prepare_dataset_only', action='store_true',
+                    help='Only run prepare_dataset() then exit')
 
     args, rem_args = parser.parse_known_args()
 
@@ -70,25 +71,11 @@ def main(args):
     
     print(f"Loading dataset '{args.dataset}'")
 
-    ckpt_path = f"{args.results_base_folder}/{args.dataset}/{args.model}"
-    prep_flag = os.path.join(ckpt_path, "._dataset_prepared")
+    if args.prepare_dataset_only:
+        if distributed_backend.is_master_process():
+            prepare_dataset(args)
+    sys.exit(0)
 
-    print(f"Rank {rank} starting dataset preparation")
-
-    if distributed_backend.is_master_process():
-        print(f"Rank {rank} preparing dataset")
-        prepare_dataset(args)
-        open(prep_flag, "w").close()
-        print(f"Rank {rank} done preparing dataset")
-    else:
-        while not os.path.exists(prep_flag):
-            time.sleep(1)
-        print(f"Rank {rank} detected dataset ready")
-
-    # barrier disabled — file‐polling replaced it
-    print(f"Rank {rank} proceeding to load dataset")
-
-    
     data = get_dataset(args)
 
     if args.data_in_ram:
@@ -171,7 +158,6 @@ def main(args):
         with open(f"{ckpt_path}/summary.json", "w") as fs:
             json.dump(stats, fs)
     distributed_backend.finalize()
-
 
 if __name__ == "__main__":
     args = get_args()
