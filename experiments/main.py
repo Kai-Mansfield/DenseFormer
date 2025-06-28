@@ -73,7 +73,7 @@ def main(args):
     original_len = len(data['train'])
     data['train'] = data['train'][args.train_start_index:]
     print(f"Training data truncated: {original_len} → {len(data['train'])} examples starting at index {args.train_start_index}")
-    print(data['train'][0])  # print first 5 examples for debugging
+    print(data['train'][:10])  # print first 5 examples for debugging
 
     print(f"Num training tokens: {len(data['train'])}")
     print(f"Num validation tokens: {len(data['val'])}")
