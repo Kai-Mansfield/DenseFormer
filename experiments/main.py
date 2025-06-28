@@ -68,8 +68,12 @@ def main(args):
     data = get_dataset(args) # data is a dict: {'train': train_tokenized, 'val': eval_tokenized}
     if args.train_start_index > 0:
         original_len = len(data['train'])
-        data['train'] = data['train'].select(range(args.train_start_index, original_len))
+        if args.data_in_ram:
+            data['train'] = np.array(data['train'])[args.train_start_index:]
+        else:
+            data['train'] = data['train'].select(range(args.train_start_index, original_len))
         print(f"Training data truncated: {original_len} → {len(data['train'])} examples starting at index {args.train_start_index}")
+
 
     if args.data_in_ram:
         data = {'train': np.array(data['train']), 'val': np.array(data['val'])}
