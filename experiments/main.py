@@ -1,16 +1,7 @@
+# main.py
+
 # Copyright 2023 Matteo Pagliardini, Amirkeivan Mohtashami, Francois Fleuret, Martin Jaggi
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Licensed under the Apache License, Version 2.0
 
 import os
 import sys
@@ -46,15 +37,13 @@ def get_args():
                     help='Starting index in the training data')
     parser.add_argument('--prepare_dataset_only', action='store_true',
                     help='Only run prepare_dataset() then exit')
-
     args, rem_args = parser.parse_known_args()
-
     return config.parse_args_with_format(format=args.config_format, base_parser=parser, args=rem_args, namespace=args)
 
 
 def main(args): 
 
-    torch.backends.cuda.matmul.allow_tf32 = True # allows us to make sure we're able to use tensorfloat32 during training
+    torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
 
     distributed_backend = distributed.make_backend_from_args(args)
@@ -75,7 +64,6 @@ def main(args):
     distributed_backend.sync()
 
     data = get_dataset(args)
-
     if args.data_in_ram:
         data = {'train': np.array(data['train']), 'val': np.array(data['val'])}
 
@@ -84,14 +72,12 @@ def main(args):
     original_len = len(data['train'])
     data['train'] = data['train'][tokens_to_skip:]
     print(f"Training data truncated: {original_len} → {len(data['train'])} tokens (skipped {args.train_start_index} iterations, {tokens_to_skip} tokens)")
-
     print(f"Num training tokens: {len(data['train'])}")
     print(f"Num validation tokens: {len(data['val'])}")
-    
-    model = models.make_model_from_args(args).to(args.device) # todo: take care of initializing the model if args.use_pretrained != 'none'
 
+    model = models.make_model_from_args(args).to(args.device)
     model = distributed_backend.transform_model(model)
-    
+
     group_specs = distributed_backend.get_raw_model(model).get_parameter_group_specs()
     param_name_mapping = {p_name: p for p_name, p in model.named_parameters()}
     optimized_params_cnt = 0
@@ -102,7 +88,8 @@ def main(args):
             params += [param_name_mapping[p_name] for p_name in translated_p_names]
         g["params"] = params
         optimized_params_cnt += sum([p.numel() for p in g["params"]])
-    print("number of optimized parameters: %.2fM" % (optimized_params_cnt/1e6,))
+    print("number of optimized parameters: %.2fM" % (optimized_params_cnt / 1e6))
+
     if args.opt == 'adamw':
         use_fused = (device_type == 'cuda') and ('fused' in inspect.signature(torch.optim.AdamW).parameters)
         print(f"using fused AdamW: {use_fused}")
@@ -111,16 +98,27 @@ def main(args):
                                 weight_decay=args.weight_decay, **extra_args)
     else:
         opt = torch.optim.SGD(group_specs, lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
-    
+
     if args.scheduler != 'none':
         if args.scheduler in ['cos', 'linear']:
-            scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer=opt, max_lr=args.lr, total_steps=args.iterations, 
-                                                            pct_start=args.warmup_percent, anneal_strategy=args.scheduler, 
-                                                            cycle_momentum=False, div_factor=1e2, final_div_factor=.1)
+            scheduler = torch.optim.lr_scheduler.OneCycleLR(
+                optimizer=opt, max_lr=args.lr, total_steps=args.iterations, 
+                pct_start=args.warmup_percent, anneal_strategy=args.scheduler, 
+                cycle_momentum=False, div_factor=1e2, final_div_factor=.1)
         else:
             raise NotImplementedError(f"Unknown scheduler type: {args.scheduler}.")
     else:
         scheduler = None
+
+    # NEW: Load from checkpoint if provided
+    if args.use_pretrained and args.use_pretrained != "none":
+        print(f"Loading checkpoint from {args.use_pretrained}")
+        checkpoint = torch.load(args.use_pretrained, map_location=args.device)
+        model.load_state_dict(checkpoint['model'], strict=True)
+        if 'optimizer' in checkpoint:
+            opt.load_state_dict(checkpoint['optimizer'])
+        if scheduler is not None and 'scheduler' in checkpoint:
+            scheduler.load_state_dict(checkpoint['scheduler'])
 
     args.world_size = distributed_backend.get_world_size()
     exp_name = args.exp_name
@@ -128,17 +126,17 @@ def main(args):
         params_copy = copy.deepcopy(vars(args))
         del params_copy['device']
         wandb.init(project=args.wandb_project, name=exp_name, config=params_copy)
-    
+
     ckpt_path = f"{args.results_base_folder}/{args.dataset}/{args.model}/{args.train_start_index}"
     if not os.path.exists(ckpt_path):
         if distributed_backend.is_master_process():
             os.makedirs(ckpt_path)
     else:
-        if os.path.isfile(f"{ckpt_path}/summary.json"): # the experiment was already completed
+        if os.path.isfile(f"{ckpt_path}/summary.json"):
             print(f"Already found experiment '{ckpt_path}'.\nSkipping.")
             sys.exit(0)
 
-    if 'base' in args.model or 'mc' in args.model or True: # all train functions have the same interfacei
+    if 'base' in args.model or 'mc' in args.model or True:
         train = train_base
     else:
         raise NotImplementedError(f"No training method implemented for model type '{args.model}'.")
@@ -149,7 +147,7 @@ def main(args):
                   eval_freq=args.eval_freq, 
                   distributed_backend=distributed_backend,
                   ckpt_path=ckpt_path, extra_args=args)
-    
+
     args.device = None
     args.dtype = None
     stats['args'] = vars(args)
