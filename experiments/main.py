@@ -1,8 +1,5 @@
 # main.py
 
-# Copyright 2023 Matteo Pagliardini, Amirkeivan Mohtashami, Francois Fleuret, Martin Jaggi
-# Licensed under the Apache License, Version 2.0
-
 import os
 import sys
 import numpy as np
@@ -13,8 +10,6 @@ import copy
 import argparse
 import random
 import wandb
-import fcntl
-import time
 
 import config
 import models
@@ -33,16 +28,13 @@ print("WORLD_SIZE:", os.environ.get("WORLD_SIZE"))
 def get_args():
     parser = argparse.ArgumentParser(allow_abbrev=False)
     parser.add_argument('--config_format', default='base', choices=config.registered_formats())
-    parser.add_argument('--train_start_index', type=int, default=0,
-                    help='Starting index in the training data')
-    parser.add_argument('--prepare_dataset_only', action='store_true',
-                    help='Only run prepare_dataset() then exit')
+    parser.add_argument('--train_start_index', type=int, default=0, help='Starting index in the training data')
+    parser.add_argument('--prepare_dataset_only', action='store_true', help='Only run prepare_dataset() then exit')
     args, rem_args = parser.parse_known_args()
     return config.parse_args_with_format(format=args.config_format, base_parser=parser, args=rem_args, namespace=args)
 
 
 def main(args): 
-
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
 
@@ -56,7 +48,7 @@ def main(args):
     torch.manual_seed(args.seed)
     random.seed(args.seed)
     np.random.seed(args.seed)
-    
+
     print(f"Loading dataset '{args.dataset}'")
 
     if distributed_backend.is_master_process():
@@ -110,15 +102,24 @@ def main(args):
     else:
         scheduler = None
 
-    # NEW: Load from checkpoint if provided
+    # === Load checkpoint if specified ===
+    resume_iter = 0
     if args.use_pretrained and args.use_pretrained != "none":
         print(f"Loading checkpoint from {args.use_pretrained}")
         checkpoint = torch.load(args.use_pretrained, map_location=args.device)
-        model.load_state_dict(checkpoint['model'], strict=True)
+
+        if 'model' in checkpoint:
+            model.load_state_dict(checkpoint['model'], strict=True)
+        else:
+            model.load_state_dict(checkpoint, strict=False)
+
         if 'optimizer' in checkpoint:
             opt.load_state_dict(checkpoint['optimizer'])
         if scheduler is not None and 'scheduler' in checkpoint:
             scheduler.load_state_dict(checkpoint['scheduler'])
+
+        resume_iter = checkpoint.get('itr', 0)
+        print(f"Resuming training from iteration {resume_iter}")
 
     args.world_size = distributed_backend.get_world_size()
     exp_name = args.exp_name
@@ -144,9 +145,11 @@ def main(args):
     print(f"\nTraining model={args.model} \n{vars(args)}\n")
 
     stats = train(model, opt, data, scheduler, args.iterations, args.acc_steps, args.batch_size, args.sequence_length, 
-                  eval_freq=args.eval_freq, 
+                  eval_freq=args.eval_freq,
                   distributed_backend=distributed_backend,
-                  ckpt_path=ckpt_path, extra_args=args)
+                  ckpt_path=ckpt_path,
+                  extra_args=args,
+                  start_iter=resume_iter)
 
     args.device = None
     args.dtype = None
@@ -155,6 +158,7 @@ def main(args):
         with open(f"{ckpt_path}/summary.json", "w") as fs:
             json.dump(stats, fs)
     distributed_backend.finalize()
+
 
 if __name__ == "__main__":
     args = get_args()
