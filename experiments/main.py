@@ -152,8 +152,7 @@ def main(args):
                   eval_freq=args.eval_freq,
                   distributed_backend=distributed_backend,
                   ckpt_path=ckpt_path,
-                  extra_args=args,
-                  start_iter=resume_iter)
+                  extra_args=args)
 
     args.device = None
     args.dtype = None
