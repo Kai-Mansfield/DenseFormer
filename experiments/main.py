@@ -108,7 +108,12 @@ def main(args):
         checkpoint = torch.load(args.use_pretrained, map_location=args.device)
 
         if 'model' in checkpoint:
-            model.load_state_dict(checkpoint['model'], strict=True)
+            state_dict = checkpoint['model']
+            # Strip "_orig_mod." prefix if present
+            stripped_state_dict = {
+                k.replace("_orig_mod.", ""): v for k, v in state_dict.items()
+            }
+            model.load_state_dict(stripped_state_dict, strict=True)
         else:
             model.load_state_dict(checkpoint, strict=False)
 
