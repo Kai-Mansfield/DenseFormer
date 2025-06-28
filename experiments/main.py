@@ -70,8 +70,6 @@ def main(args):
     
     print(f"Loading dataset '{args.dataset}'")
 
-    print(f"Rank {rank} starting dataset preparation")
-
     ckpt_path = f"{args.results_base_folder}/{args.dataset}/{args.model}"
     prep_flag = os.path.join(ckpt_path, "._dataset_prepared")
 
