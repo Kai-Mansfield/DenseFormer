@@ -35,7 +35,6 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
 
     # Suppose you create your batch iterator here:
     print(f"[Rank {rank}] >> Creating data iterator", flush=True)
-    batch_iter = … 
     print(f"[Rank {rank}] >> Data iterator ready", flush=True)
 
     for itr in range(iterations):
