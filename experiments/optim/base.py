@@ -39,7 +39,7 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
 
     for itr in range(iterations):
         print(f"[Rank {rank}] >> itr {itr} — fetching batch", flush=True)
-        batch = next(batch_iter)
+        batch = next(batch_size)
         print(f"[Rank {rank}] >> itr {itr} — batch fetched", flush=True)
 
         print(f"[Rank {rank}] >> itr {itr} — forward pass", flush=True)
