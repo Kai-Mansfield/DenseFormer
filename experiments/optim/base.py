@@ -25,7 +25,7 @@ import sys
 from .utils import eval, get_batch, save_checkpoint
 
 
-def train_base(model, optimizer, data, scheduler, iterations, acc_steps, batch_size, seq_len, eval_freq, distributed_backend, ckpt_path, extra_args):
+def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, sequence_length, eval_freq, ckpt_path, distributed_backend, extra_args):
     try:
         rank = distributed_backend.get_rank()
     except AttributeError:
