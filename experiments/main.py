@@ -78,18 +78,16 @@ def main(args):
     if distributed_backend.is_master_process():
         print(f"Rank {rank} preparing dataset")
         prepare_dataset(args)
-        # touch the flag
         open(prep_flag, "w").close()
         print(f"Rank {rank} done preparing dataset")
     else:
-        # wait for the flag file to appear
         while not os.path.exists(prep_flag):
             time.sleep(1)
         print(f"Rank {rank} detected dataset ready")
 
-    # barrier so all ranks proceed together
-    distributed_backend.sync()
-    print(f"Rank {rank} passed sync() and can load")
+    # barrier disabled — file‐polling replaced it
+    print(f"Rank {rank} proceeding to load dataset")
+
     
     data = get_dataset(args)
 
