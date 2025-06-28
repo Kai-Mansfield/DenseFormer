@@ -72,10 +72,10 @@ def main(args):
 
     if distributed_backend.is_master_process():
         prepare_dataset(args)
-        
-    print(f"Rank {rank} finished dataset preparation (or skipping if not master)")
 
     distributed_backend.sync()
+        
+    print(f"Rank {rank} finished dataset preparation (or skipping if not master)")
 
     print(f"Rank {rank} passed sync()")
     
