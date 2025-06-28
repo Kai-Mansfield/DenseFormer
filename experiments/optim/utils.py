@@ -50,8 +50,19 @@ def eval(model, data_tensor, sequence_length, batch_size, device='cpu', max_num_
 
 def save_checkpoint(distributed_backend, model, opt, scheduler, itr, ckpt_path, **extra_args):
 
+    raw_model = distributed_backend.get_raw_model(model)
+    state_dict = raw_model.state_dict()
+
+    # Strip _orig_mod. if present
+    clean_state_dict = {}
+    for k, v in state_dict.items():
+        new_key = k
+        if k.startswith("_orig_mod."):
+            new_key = k[len("_orig_mod."):]
+        clean_state_dict[new_key] = v
+
     checkpoint = dict({
-        'model': distributed_backend.get_raw_model(model).state_dict(),
+        'model': clean_state_dict,
         'optimizer': opt.state_dict(),
         'scheduler': scheduler.state_dict(),
         'itr': itr,
