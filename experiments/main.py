@@ -71,6 +71,7 @@ def main(args):
     print(f"Rank {rank} starting dataset preparation")
 
     if distributed_backend.is_master_process():
+        print(f"Rank {rank} preparing dataset")
         prepare_dataset(args)
 
     distributed_backend.sync()
