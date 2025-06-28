@@ -65,9 +65,16 @@ def main(args):
     
     print(f"Loading dataset '{args.dataset}'")
 
+    print(f"Rank {args.rank} starting dataset preparation")
+
     if distributed_backend.is_master_process():
         prepare_dataset(args)
+        
+    print(f"Rank {args.rank} finished dataset preparation (or skipping if not master)")
+
     distributed_backend.sync()
+
+    print(f"Rank {args.rank} passed sync()")
     
     data = get_dataset(args)
 
