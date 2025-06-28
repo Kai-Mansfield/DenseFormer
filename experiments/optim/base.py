@@ -24,11 +24,11 @@ import sys
 
 from .utils import eval, get_batch, save_checkpoint
 
-def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, sequence_length, eval_freq, ckpt_path, distributed_backend, extra_args):
+def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, sequence_length, eval_freq, ckpt_path, distributed_backend, extra_args, srt_iter=0):
     device_type = 'cuda' if 'cuda' in str(extra_args.device) else 'cpu'
     type_ctx = nullcontext() if device_type == 'cpu' else torch.amp.autocast(
         device_type=device_type, dtype=extra_args.dtype)  # extra_args.dtype)
-    itr, substep, best_val_loss, text_table = 0, 0, float('inf'), None # best_val_loss not used atm, early stopping not recommended but possible 
+    itr, substep, best_val_loss, text_table = srt_iter, 0, float('inf'), None # best_val_loss not used atm, early stopping not recommended but possible 
 
     stats = {'train_loss': [], 'val_loss': [], 'val_pp': [], 'val_acc': []}
 
