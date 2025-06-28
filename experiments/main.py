@@ -22,6 +22,7 @@ import copy
 import argparse
 import random
 import wandb
+import fcntl
 
 import config
 import models
@@ -70,12 +71,22 @@ def main(args):
 
     print(f"Rank {rank} starting dataset preparation")
 
+    lock_file = os.path.join(ckpt_path, "prep.lock")
     if distributed_backend.is_master_process():
-        print(f"Rank {rank} preparing dataset")
-        prepare_dataset(args)
+        # rank 0 takes the lock, does prep, then releases
+        with open(lock_file, "w") as lf:
+            fcntl.flock(lf, fcntl.LOCK_EX)
+            prepare_dataset(args)
+            fcntl.flock(lf, fcntl.LOCK_UN)
+    else:
+        # rank != 0 waits for the lock to be released
+        with open(lock_file, "w") as lf:
+            fcntl.flock(lf, fcntl.LOCK_SH)
+            # immediately releases
+            fcntl.flock(lf, fcntl.LOCK_UN)
 
     distributed_backend.sync()
-        
+ 
     print(f"Rank {rank} finished dataset preparation (or skipping if not master)")
 
     print(f"Rank {rank} passed sync()")
