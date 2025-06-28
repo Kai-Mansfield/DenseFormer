@@ -99,13 +99,13 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
                 t0 = time.time()
         if distributed_backend.is_master_process():
             if extra_args.save_checkpoint_freq is not None and itr % extra_args.save_checkpoint_freq == 0:
-                print(f"saving checkpoint to {ckpt_path}/ckpt_{itr}.pt")
+                print(f"saving checkpoint to {ckpt_path}/ckpt.pt")
                 save_checkpoint(distributed_backend=distributed_backend,
                                 model=model,
                                 opt=opt,
                                 scheduler=scheduler,
                                 itr=itr,
-                                ckpt_path=f"{ckpt_path}/ckpt_{itr}.pt")
+                                ckpt_path=f"{ckpt_path}/ckpt.pt")
 
     if distributed_backend.is_master_process():
         print(f"saving checkpoint to {ckpt_path}")

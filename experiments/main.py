@@ -28,7 +28,6 @@ print("WORLD_SIZE:", os.environ.get("WORLD_SIZE"))
 def get_args():
     parser = argparse.ArgumentParser(allow_abbrev=False)
     parser.add_argument('--config_format', default='base', choices=config.registered_formats())
-    parser.add_argument('--train_start_index', type=int, default=0, help='Starting index in the training data')
     parser.add_argument('--prepare_dataset_only', action='store_true', help='Only run prepare_dataset() then exit')
     args, rem_args = parser.parse_known_args()
     return config.parse_args_with_format(format=args.config_format, base_parser=parser, args=rem_args, namespace=args)
@@ -58,11 +57,6 @@ def main(args):
     if args.data_in_ram:
         data = {'train': np.array(data['train']), 'val': np.array(data['val'])}
 
-    tokens_per_iter = args.batch_size * args.sequence_length
-    tokens_to_skip = args.train_start_index * tokens_per_iter
-    original_len = len(data['train'])
-    data['train'] = data['train'][tokens_to_skip:]
-    print(f"Training data truncated: {original_len} → {len(data['train'])} tokens (skipped {args.train_start_index} iterations, {tokens_to_skip} tokens)")
     print(f"Num training tokens: {len(data['train'])}")
     print(f"Num validation tokens: {len(data['val'])}")
 
@@ -132,7 +126,7 @@ def main(args):
         del params_copy['device']
         wandb.init(project=args.wandb_project, name=exp_name, config=params_copy)
 
-    ckpt_path = f"{args.results_base_folder}/{args.dataset}/{args.model}/{args.train_start_index}"
+    ckpt_path = f"{args.results_base_folder}/{args.dataset}/{args.model}"
     if not os.path.exists(ckpt_path):
         if distributed_backend.is_master_process():
             os.makedirs(ckpt_path)
