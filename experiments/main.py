@@ -29,6 +29,10 @@ from data.utils import get_dataset, prepare_dataset
 from optim.base import train_base
 import distributed
 
+print("MASTER_ADDR:", os.environ.get("MASTER_ADDR"))
+print("MASTER_PORT:", os.environ.get("MASTER_PORT"))
+print("RANK:", os.environ.get("RANK"))
+print("WORLD_SIZE:", os.environ.get("WORLD_SIZE"))
 
 def get_args():
     parser = argparse.ArgumentParser(allow_abbrev=False)
