@@ -65,18 +65,19 @@ def main(args):
         prepare_dataset(args)
     distributed_backend.sync()
     
-    data = get_dataset(args) # data is a dict: {'train': train_tokenized, 'val': eval_tokenized}
+    data = get_dataset(args)
+
+    if args.data_in_ram:
+        data = {'train': np.array(data['train']), 'val': np.array(data['val'])}
+
     if args.train_start_index > 0:
         original_len = len(data['train'])
         if args.data_in_ram:
-            data['train'] = np.array(data['train'])[args.train_start_index:]
+            data['train'] = data['train'][args.train_start_index:]
         else:
             data['train'] = data['train'].select(range(args.train_start_index, original_len))
         print(f"Training data truncated: {original_len} → {len(data['train'])} examples starting at index {args.train_start_index}")
 
-
-    if args.data_in_ram:
-        data = {'train': np.array(data['train']), 'val': np.array(data['val'])}
         
     print(f"Num training tokens: {len(data['train'])}")
     print(f"Num validation tokens: {len(data['val'])}")
