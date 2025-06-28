@@ -70,10 +70,9 @@ def main(args):
     
     print(f"Loading dataset '{args.dataset}'")
 
-    if args.prepare_dataset_only:
-        if distributed_backend.is_master_process():
-            prepare_dataset(args)
-        sys.exit(0)
+    if distributed_backend.is_master_process():
+        prepare_dataset(args)
+    distributed_backend.sync()
 
     data = get_dataset(args)
 
