@@ -23,6 +23,7 @@ import argparse
 import random
 import wandb
 import fcntl
+import time
 
 import config
 import models
@@ -72,26 +73,25 @@ def main(args):
     print(f"Rank {rank} starting dataset preparation")
 
     ckpt_path = f"{args.results_base_folder}/{args.dataset}/{args.model}"
+    prep_flag = os.path.join(ckpt_path, "._dataset_prepared")
 
-    lock_file = os.path.join(ckpt_path, "prep.lock")
+    print(f"Rank {rank} starting dataset preparation")
+
     if distributed_backend.is_master_process():
-        # rank 0 takes the lock, does prep, then releases
-        with open(lock_file, "w") as lf:
-            fcntl.flock(lf, fcntl.LOCK_EX)
-            prepare_dataset(args)
-            fcntl.flock(lf, fcntl.LOCK_UN)
+        print(f"Rank {rank} preparing dataset")
+        prepare_dataset(args)
+        # touch the flag
+        open(prep_flag, "w").close()
+        print(f"Rank {rank} done preparing dataset")
     else:
-        # rank != 0 waits for the lock to be released
-        with open(lock_file, "w") as lf:
-            fcntl.flock(lf, fcntl.LOCK_SH)
-            # immediately releases
-            fcntl.flock(lf, fcntl.LOCK_UN)
+        # wait for the flag file to appear
+        while not os.path.exists(prep_flag):
+            time.sleep(1)
+        print(f"Rank {rank} detected dataset ready")
 
+    # barrier so all ranks proceed together
     distributed_backend.sync()
- 
-    print(f"Rank {rank} finished dataset preparation (or skipping if not master)")
-
-    print(f"Rank {rank} passed sync()")
+    print(f"Rank {rank} passed sync() and can load")
     
     data = get_dataset(args)
 
