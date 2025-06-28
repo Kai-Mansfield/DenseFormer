@@ -29,6 +29,9 @@ from data.utils import get_dataset, prepare_dataset
 from optim.base import train_base
 import distributed
 
+rank = int(os.environ.get('RANK', 0))
+world_size = int(os.environ.get('WORLD_SIZE', 1))
+
 print("MASTER_ADDR:", os.environ.get("MASTER_ADDR"))
 print("MASTER_PORT:", os.environ.get("MASTER_PORT"))
 print("RANK:", os.environ.get("RANK"))
@@ -65,16 +68,16 @@ def main(args):
     
     print(f"Loading dataset '{args.dataset}'")
 
-    print(f"Rank {args.rank} starting dataset preparation")
+    print(f"Rank {rank} starting dataset preparation")
 
     if distributed_backend.is_master_process():
         prepare_dataset(args)
         
-    print(f"Rank {args.rank} finished dataset preparation (or skipping if not master)")
+    print(f"Rank {rank} finished dataset preparation (or skipping if not master)")
 
     distributed_backend.sync()
 
-    print(f"Rank {args.rank} passed sync()")
+    print(f"Rank {rank} passed sync()")
     
     data = get_dataset(args)
 
