@@ -33,6 +33,9 @@ import distributed
 def get_args():
     parser = argparse.ArgumentParser(allow_abbrev=False)
     parser.add_argument('--config_format', default='base', choices=config.registered_formats())
+    parser.add_argument('--train_start_index', type=int, default=0,
+                    help='Starting index in the training data')
+
 
     args, rem_args = parser.parse_known_args()
 
@@ -63,6 +66,11 @@ def main(args):
     distributed_backend.sync()
     
     data = get_dataset(args) # data is a dict: {'train': train_tokenized, 'val': eval_tokenized}
+    if args.train_start_index > 0:
+        original_len = len(data['train'])
+        data['train'] = data['train'].select(range(args.train_start_index, original_len))
+        print(f"Training data truncated: {original_len} → {len(data['train'])} examples starting at index {args.train_start_index}")
+
     if args.data_in_ram:
         data = {'train': np.array(data['train']), 'val': np.array(data['val'])}
         
