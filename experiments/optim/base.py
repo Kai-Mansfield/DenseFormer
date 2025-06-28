@@ -26,14 +26,36 @@ from .utils import eval, get_batch, save_checkpoint
 
 
 def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, sequence_length, eval_freq, ckpt_path, distributed_backend, extra_args):
+    rank = 0
     try:
         rank = distributed_backend.get_rank()
-    except AttributeError:
-        # single‐GPU or DataParallel path: treat as rank 0
-        rank = 0
+    except:
+        pass
+    print(f"[Rank {rank}] >> train_base start", flush=True)
 
-    print(f"[Rank {rank}] Entered train_base")
-    sys.stdout.flush()
+    # Suppose you create your batch iterator here:
+    print(f"[Rank {rank}] >> Creating data iterator", flush=True)
+    batch_iter = … 
+    print(f"[Rank {rank}] >> Data iterator ready", flush=True)
+
+    for itr in range(iterations):
+        print(f"[Rank {rank}] >> itr {itr} — fetching batch", flush=True)
+        batch = next(batch_iter)
+        print(f"[Rank {rank}] >> itr {itr} — batch fetched", flush=True)
+
+        print(f"[Rank {rank}] >> itr {itr} — forward pass", flush=True)
+        outputs = model(batch)
+        print(f"[Rank {rank}] >> itr {itr} — forward done", flush=True)
+
+        print(f"[Rank {rank}] >> itr {itr} — backward", flush=True)
+        loss = outputs.loss
+        loss.backward()
+        print(f"[Rank {rank}] >> itr {itr} — backward done", flush=True)
+
+        print(f"[Rank {rank}] >> itr {itr} — optimizer step", flush=True)
+        opt.step()
+        opt.zero_grad()
+        print(f"[Rank {rank}] >> itr {itr} — optimizer done", flush=True)
     device_type = 'cuda' if 'cuda' in str(extra_args.device) else 'cpu'
     type_ctx = nullcontext() if device_type == 'cpu' else torch.amp.autocast(
         device_type=device_type, dtype=extra_args.dtype)  # extra_args.dtype)
