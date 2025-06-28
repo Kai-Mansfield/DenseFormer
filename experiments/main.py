@@ -54,7 +54,6 @@ def get_args():
 
 def main(args): 
 
-
     torch.backends.cuda.matmul.allow_tf32 = True # allows us to make sure we're able to use tensorfloat32 during training
     torch.backends.cudnn.allow_tf32 = True
 
@@ -74,7 +73,7 @@ def main(args):
     if args.prepare_dataset_only:
         if distributed_backend.is_master_process():
             prepare_dataset(args)
-    sys.exit(0)
+        sys.exit(0)
 
     data = get_dataset(args)
 
