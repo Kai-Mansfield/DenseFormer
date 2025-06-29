@@ -14,11 +14,13 @@
 
 from . import base
 from . import denseformer
+from . import denseformer2
 from . import connect_to_last
 from . import base_w_gains
 
 MODELS = {
     "denseformer": denseformer.DenseFormer,
+    "denseformer2": denseformer2.DenseFormer2,
     "base": base.GPTBase,
     "connecttolast": connect_to_last.GPTBase,
     "basewgains": base_w_gains.GPTBase,
