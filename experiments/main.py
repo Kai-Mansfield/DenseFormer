@@ -22,8 +22,8 @@ world_size = int(os.environ.get('WORLD_SIZE', 1))
 
 print("MASTER_ADDR:", os.environ.get("MASTER_ADDR"))
 print("MASTER_PORT:", os.environ.get("MASTER_PORT"))
-print("RANK:", os.environ.get("RANK"))
-print("WORLD_SIZE:", os.environ.get("WORLD_SIZE"))
+print("RANK:", rank)
+print("WORLD_SIZE:", world_size)
 
 def get_args():
     parser = argparse.ArgumentParser(allow_abbrev=False)
@@ -64,7 +64,10 @@ def main(args):
     print(f"Loading dataset '{args.dataset}'")
 
     if distributed_backend.is_master_process():
+        print("RANK:", rank, 'preparing dataset')
         prepare_dataset(args)
+    else:
+        print("RANK:", rank, 'waiting for dataset preparation')
     distributed_backend.sync()
 
     data = get_dataset(args)
