@@ -32,6 +32,20 @@ def get_args():
     args, rem_args = parser.parse_known_args()
     return config.parse_args_with_format(format=args.config_format, base_parser=parser, args=rem_args, namespace=args)
 
+# Adjust for missing/present "module." prefix
+def adjust_state_dict(state_dict, model):
+    model_keys = list(model.state_dict().keys())
+    ckpt_keys = list(state_dict.keys())
+
+    if all(k.startswith("module.") for k in model_keys) and not any(k.startswith("module.") for k in ckpt_keys):
+        # Add "module." prefix
+        state_dict = {"module." + k: v for k, v in state_dict.items()}
+    elif not any(k.startswith("module.") for k in model_keys) and all(k.startswith("module.") for k in ckpt_keys):
+        # Remove "module." prefix
+        state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
+
+    return state_dict
+
 def main(args): 
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
@@ -100,23 +114,12 @@ def main(args):
     if args.use_pretrained and args.use_pretrained != "none":
         print(f"Loading checkpoint from {args.use_pretrained}")
         checkpoint = torch.load(args.use_pretrained, map_location=args.device)
-        checkpoint = {"module." + k: v for k, v in checkpoint.items()}
-        checkpoint = model.load_state_dict(checkpoint)   
-
         if 'model' in checkpoint:
             state_dict = checkpoint['model']
-            # Strip "_orig_mod." prefix if present
-            stripped_state_dict = {
-                k.replace("_orig_mod.", ""): v for k, v in state_dict.items()
-            }
-            model.load_state_dict(stripped_state_dict, strict=True)
         else:
-            model.load_state_dict(checkpoint, strict=False)
-
-        if 'optimizer' in checkpoint:
-            opt.load_state_dict(checkpoint['optimizer'])
-        if scheduler is not None and 'scheduler' in checkpoint:
-            scheduler.load_state_dict(checkpoint['scheduler'])
+            state_dict = checkpoint
+        state_dict = adjust_state_dict(state_dict, model)
+        model.load_state_dict(state_dict, strict=True)
 
         resume_iter = checkpoint.get('itr', 0)
         print(f"Resuming training from iteration {resume_iter}")
