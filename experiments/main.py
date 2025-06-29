@@ -70,7 +70,7 @@ def main(args):
     else:
         print("RANK:", rank, 'skipping dataset preparation')
     print("RANK:", rank, 'syncing')
-    distributed_backend.sync()
+    #distributed_backend.sync()
     print("RANK:", rank, 'done syncing')
 
     data = get_dataset(args)
