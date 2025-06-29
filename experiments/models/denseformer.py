@@ -284,10 +284,7 @@ class DenseFormer(nn.Module):
                 x,
                 
             )
-            print(self.weights[rep_idx - 1].weight.view(-1).shape)
-            print(x_accs[rep_idx % self.dilation_factor][1].shape)
             x = torch.tensordot(self.weights[rep_idx - 1].weight.view(-1), x_accs[rep_idx % self.dilation_factor][1], dims=1)
-            print(x.shape)
             
         x = self.transformer.ln_f(x)
 
