@@ -67,7 +67,10 @@ class DataParallelDistributedBackend(DistributedBackend):
         return get_world_size()
     
     def sync(self):
-        barrier()
+        import torch.distributed as dist
+        print(f"[sync] RANK {dist.get_rank()} entering barrier")
+        dist.barrier()
+        print(f"[sync] RANK {dist.get_rank()} passed barrier")
 
     def finalize(self):
         destroy_process_group()
