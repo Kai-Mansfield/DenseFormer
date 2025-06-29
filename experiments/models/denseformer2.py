@@ -179,7 +179,7 @@ class Block(nn.Module):
         return x
 
 
-class DenseFormer(nn.Module):
+class DenseFormer2(nn.Module):
 
     needs_iter = False
 
@@ -205,7 +205,7 @@ class DenseFormer(nn.Module):
         ))
 
         self.weights = nn.ModuleList([
-            nn.Linear((i + 2 + self.dilation_factor - 1) // self.dilation_factor, 1, bias=False) 
+            nn.Linear(2 * (i + 2 + self.dilation_factor - 1) // self.dilation_factor, 1, bias=False) 
             for i in range(self.n_repeat)
         ])
 
@@ -254,7 +254,6 @@ class DenseFormer(nn.Module):
         b, t = idx.size()
         assert t <= self.config.sequence_length, f"Cannot forward sequence of length {t}, block size is only {self.config.sequence_length}"
         
-        
         # forward the GPT model itself
         if use_cache:
             idx, index_shift, cache_context = self.lm_cache(idx)
@@ -284,9 +283,15 @@ class DenseFormer(nn.Module):
                 x,
                 
             )
-            x = torch.tensordot(self.weights[rep_idx - 1].weight.view(-1), x_accs[rep_idx % self.dilation_factor][1], dims=1)
-            print(x_accs[rep_idx % self.dilation_factor][1].shape)
-            
+            x_stack = x_accs[rep_idx % self.dilation_factor][1]  # shape: [n, B, T, C]
+            C = x_stack.shape[-1]
+            split_sizes = [(C + 1) // 2, C // 2]  # First half gets the extra dim if odd
+            x_left, x_right = torch.tensor_split(x_stack, split_sizes, dim=-1)  # shape: [n, B, T, C//2 or (C+1)//2]
+            x_cat = torch.cat([x_left, x_right], dim=0)  # shape: [2n, B, T, *]
+
+            # Apply DWA
+            x = torch.tensordot(self.weights[rep_idx - 1].weight.view(-1), x_cat, dims=1)
+
         x = self.transformer.ln_f(x)
 
         if use_cache:
