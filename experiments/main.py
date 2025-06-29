@@ -66,8 +66,9 @@ def main(args):
     if distributed_backend.is_master_process():
         print("RANK:", rank, 'preparing dataset')
         prepare_dataset(args)
+        print("RANK:", rank, 'done preparing dataset')
     else:
-        print("RANK:", rank, 'waiting for dataset preparation')
+        print("RANK:", rank, 'skipping dataset preparation')
     distributed_backend.sync()
 
     data = get_dataset(args)
