@@ -68,7 +68,7 @@ class DataParallelDistributedBackend(DistributedBackend):
     
     def sync(self):
         import torch.distributed as dist
-        print(f"[sync] RANK {dist.get_rank()} entering barrier")
+        print(f"Rank {dist.get_rank()} of {dist.get_world_size()} reached sync")
         barrier()
         print(f"[sync] RANK {dist.get_rank()} passed barrier")
 

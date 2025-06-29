@@ -70,9 +70,14 @@ def main(args):
         print("RANK:", rank, 'done preparing dataset')
     else:
         print("RANK:", rank, 'skipping dataset preparation')
-    print("RANK:", rank, 'syncing')
-    distributed_backend.sync()
-    print("RANK:", rank, 'done syncing')
+        
+    try:
+        print(f"RANK {rank} calling sync()")
+        distributed_backend.sync()
+        print(f"RANK {rank} done syncing")
+    except Exception as e:
+        print(f"RANK {rank} error during sync: {e}")
+        raise
 
     data = get_dataset(args)
     if args.data_in_ram:
