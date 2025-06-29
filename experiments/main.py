@@ -100,6 +100,8 @@ def main(args):
     if args.use_pretrained and args.use_pretrained != "none":
         print(f"Loading checkpoint from {args.use_pretrained}")
         checkpoint = torch.load(args.use_pretrained, map_location=args.device)
+        checkpoint = {"module." + k: v for k, v in checkpoint.items()}
+        checkpoint = model.load_state_dict(checkpoint)   
 
         if 'model' in checkpoint:
             state_dict = checkpoint['model']
