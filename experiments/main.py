@@ -10,6 +10,9 @@ import copy
 import argparse
 import random
 import wandb
+import signal
+import faulthandler
+faulthandler.enable()
 
 import config
 import models
@@ -70,7 +73,7 @@ def main(args):
     else:
         print("RANK:", rank, 'skipping dataset preparation')
     print("RANK:", rank, 'syncing')
-    #distributed_backend.sync()
+    distributed_backend.sync()
     print("RANK:", rank, 'done syncing')
 
     data = get_dataset(args)
