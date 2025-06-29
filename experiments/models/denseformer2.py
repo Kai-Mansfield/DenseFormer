@@ -179,7 +179,7 @@ class Block(nn.Module):
         return x
 
 
-class DenseFormer2(nn.Module):
+class DenseFormer(nn.Module):
 
     needs_iter = False
 
@@ -285,14 +285,20 @@ class DenseFormer2(nn.Module):
                 
             )
             x_stack = x_accs[rep_idx % self.dilation_factor][1]  
+            if x_stack is None:
+                raise RuntimeError(f"x_stack is None at rep_idx={rep_idx}")
             C = x_stack.shape[-1]
-            split_sizes = [(C + 1) // 2, C // 2]  
+            if C == 0:
+                raise RuntimeError(f"Trying to split along empty embedding dim: {C}")
+            split_sizes = [(C + 1) // 2, C // 2]  # First half gets the extra dim if odd
             x_left, x_right = torch.split(x_stack, split_sizes, dim=-1)
             w = self.weights[rep_idx - 1].weight.view(-1)
             n = w.numel() // 2
+            assert w.numel() == 2 * n, f"Expected {2 * n} weights, got {w.numel()}"
             x_left = torch.tensordot(w[:n], x_left, dims=1)
             x_right = torch.tensordot(w[n:], x_right, dims=1)
             x = torch.cat([x_left, x_right], dim=-1) 
+            del x_left, x_right, split_sizes, x_stack, C, n, w
 
         x = self.transformer.ln_f(x)
 
