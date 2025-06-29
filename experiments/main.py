@@ -71,6 +71,7 @@ def main(args):
         print("RANK:", rank, 'skipping dataset preparation')
     print("RANK:", rank, 'syncing')
     distributed_backend.sync()
+    print("RANK:", rank, 'done syncing')
 
     data = get_dataset(args)
     if args.data_in_ram:
