@@ -14,10 +14,12 @@
 
 
 from . import ddp
+from . import mp
 from . import single
 
 BACKEND_TYPE_TO_MODULE_MAP = {
     "nccl": ddp.DataParallelDistributedBackend,
+    'mp': mp.mp,
     None: single.SinlgeNodeBackend,
 }
 
