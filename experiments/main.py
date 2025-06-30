@@ -146,19 +146,19 @@ def main(args):
             model=model,
             model_parameters=model.parameters()
         )
-        # Load checkpoint after DeepSpeed init
+
+        # Load checkpoint via DeepSpeed API after initialization
         resume_iter = 0
         if args.use_pretrained and args.use_pretrained != "none":
-            print(f"Loading checkpoint from {args.use_pretrained}")
-            checkpoint = torch.load(args.use_pretrained, map_location=args.device)
-            resume_iter = checkpoint.get('itr', 0)
+            print(f"Loading checkpoint from {args.use_pretrained} using DeepSpeed load_checkpoint")
+            load_success, client_state = model_engine.load_checkpoint(args.use_pretrained)
+            if not load_success:
+                raise RuntimeError(f"Failed to load DeepSpeed checkpoint from {args.use_pretrained}")
+            resume_iter = client_state.get('itr', 0) if client_state else 0
             print(f"Resuming training from iteration {resume_iter}")
 
-            state_dict = checkpoint['model'] if 'model' in checkpoint else checkpoint
-            model_engine.module.load_state_dict(adjust_state_dict(state_dict, model_engine.module), strict=True)
-
     else:
-        # non-DeepSpeed optimizer setup stays as you had it
+        # Setup optimizer for non-DeepSpeed
         if args.opt == 'adamw':
             use_fused = (device_type == 'cuda') and ('fused' in inspect.signature(torch.optim.AdamW).parameters)
             print(f"using fused AdamW: {use_fused}")
@@ -168,17 +168,16 @@ def main(args):
         else:
             optimizer = torch.optim.SGD(group_specs, lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
 
-    # Load checkpoint for non-DeepSpeed
-    resume_iter = 0
-    if args.use_pretrained and args.use_pretrained != "none":
-        print(f"Loading checkpoint from {args.use_pretrained}")
-        checkpoint = torch.load(args.use_pretrained, map_location=args.device)
-        resume_iter = checkpoint.get('itr', 0)
-        print(f"Resuming training from iteration {resume_iter}")
+        # Load checkpoint normally
+        resume_iter = 0
+        if args.use_pretrained and args.use_pretrained != "none":
+            print(f"Loading checkpoint from {args.use_pretrained}")
+            checkpoint = torch.load(args.use_pretrained, map_location=args.device)
+            resume_iter = checkpoint.get('itr', 0)
+            print(f"Resuming training from iteration {resume_iter}")
 
-        state_dict = checkpoint['model'] if 'model' in checkpoint else checkpoint
-        model.load_state_dict(adjust_state_dict(state_dict, model), strict=True)
-
+            state_dict = checkpoint['model'] if 'model' in checkpoint else checkpoint
+            model.load_state_dict(adjust_state_dict(state_dict, model), strict=True)
 
     if args.scheduler != 'none' and not args.deepspeed:
         if args.scheduler in ['cos', 'linear']:
