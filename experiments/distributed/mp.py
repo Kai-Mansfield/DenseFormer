@@ -1,20 +1,47 @@
+# Copyright 2023 Matteo Pagliardini, Amirkeivan Mohtashami, Francois Fleuret, Martin Jaggi
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 import math
 from contextlib import contextmanager
 
-class mp:
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.distributed.fsdp.wrap import default_auto_wrap_policy
+from torch.distributed.fsdp import MixedPrecision
+from torch.distributed import init_process_group, destroy_process_group, get_world_size, barrier
+
+from .backend import DistributedBackend
+
+
+class DataParallelDistributedBackend(DistributedBackend):
+
     def __init__(self, args):
         self.rank = int(os.environ.get('RANK', -1))
-        assert self.rank != -1, "MP backend requires RANK environment variable"
-        assert "cuda" in args.device, "MP backend requires CUDA devices"
+        assert self.rank != -1, "DDP backend can not be used without rank"
+        assert "cuda" in args.device, "DDP backend can not be used on non-CUDA devices"
+        os.environ["TORCH_FSDP_AUTOWRAP_POLICY"] = "TRANSFORMER_BASED_WRAP"
+        os.environ["TORCH_FSDP_DEFAULT_MIN_NUM_PARAMS"] = "100000" 
+        init_process_group(backend=args.distributed_backend)
         self.local_rank = int(os.environ['LOCAL_RANK'])
 
     def get_adjusted_args_for_process(self, args):
-        # Adjust batch size and acc_steps like DDP to split work evenly
         effective_batch_size = args.batch_size * args.acc_steps
         world_size = self.get_world_size()
         if effective_batch_size % world_size != 0:
-            raise ValueError(f"Effective batch size {effective_batch_size} not divisible by world size {world_size}.")
+            raise ValueError(f"Effective batch size "
+                             "{effective_batch_size} is not divisible "
+                             "by the world size {world_size}.")
         acc_steps_div = math.gcd(args.acc_steps, world_size)
         args.acc_steps = args.acc_steps // acc_steps_div
         args.batch_size = args.batch_size // (world_size // acc_steps_div)
@@ -23,32 +50,40 @@ class mp:
         return args
 
     def transform_model(self, model):
-        # Do NOT wrap with DDP, just return model as-is
-        return model
+        fsdp_policy = default_auto_wrap_policy(model)
+        
+        mp_policy = MixedPrecision(param_dtype=torch.bfloat16)  # Optional, improves memory efficiency
+        
+        return FSDP(
+            model,
+            auto_wrap_policy=fsdp_policy,
+            mixed_precision=mp_policy,  # comment out if you're unsure about bfloat16 support
+            device_id=torch.device(f"cuda:{self.local_rank}")
+        )
 
     @contextmanager
     def get_context_for_microstep_forward(self, model, microstep_idx, gradient_accumulation_steps):
-        # No grad sync management needed
+        model.require_backward_grad_sync = (
+            microstep_idx == gradient_accumulation_steps - 1)
         yield
 
     def is_master_process(self) -> bool:
         return self.rank == 0
 
     def get_raw_model(self, model):
-        # No DDP wrapper, so return model directly
-        return model
+        return FSDP.unwrap(model)
 
     def translate_model_parameter_name_for_node(self, parameter_name):
-        # No module prefix from DDP, return param as list
-        return [parameter_name]
+        return [f'module.{parameter_name}']
 
     def get_world_size(self):
-        return int(os.environ.get('WORLD_SIZE', 1))
-
+        return get_world_size()
+    
     def sync(self):
-        # No distributed sync, so no-op or optionally print info
-        pass
+        import torch.distributed as dist
+        print(f"Rank {dist.get_rank()} of {dist.get_world_size()} reached sync")
+        barrier()
+        print(f"[sync] RANK {dist.get_rank()} passed barrier")
 
     def finalize(self):
-        # No process group to destroy
-        pass
+        destroy_process_group()
