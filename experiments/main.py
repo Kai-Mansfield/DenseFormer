@@ -173,11 +173,15 @@ def main(args):
     if args.use_pretrained and args.use_pretrained != "none":
         print(f"Loading checkpoint from {args.use_pretrained}")
         checkpoint = torch.load(args.use_pretrained, map_location=args.device)
-        state_dict = checkpoint['model'] if 'model' in checkpoint else checkpoint
-        state_dict = adjust_state_dict(state_dict, model)
-        model.load_state_dict(state_dict, strict=True)
         resume_iter = checkpoint.get('itr', 0)
         print(f"Resuming training from iteration {resume_iter}")
+
+        state_dict = checkpoint['model'] if 'model' in checkpoint else checkpoint
+        if args.deepspeed:
+            # Use .module if model_engine is wrapped
+            model_engine.module.load_state_dict(adjust_state_dict(state_dict, model_engine.module), strict=True)
+        else:
+            model.load_state_dict(adjust_state_dict(state_dict, model), strict=True)
 
     if not args.deepspeed:
         args.world_size = distributed_backend.get_world_size()
