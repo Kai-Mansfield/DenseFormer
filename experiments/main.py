@@ -72,8 +72,7 @@ def main(args):
     print(f"Loading dataset '{args.dataset}'")
 
     if args.deepspeed:
-        import torch.distributed as dist
-
+        import deepspeed.comm as dist
         is_master = int(os.environ.get("RANK", 0)) == 0
         if is_master:
             print("RANK:", rank, "preparing dataset")
