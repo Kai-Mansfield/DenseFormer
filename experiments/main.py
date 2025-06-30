@@ -98,7 +98,7 @@ def main(args):
 
     model = models.make_model_from_args(args).to(args.device)
 
-    # Get param group specs BEFORE wrapping — so param names are original
+    # Get param group specs BEFORE wrapping
     group_specs = model.get_parameter_group_specs()
 
     # Wrap the model with FSDP
@@ -115,8 +115,8 @@ def main(args):
     for g in group_specs:
         params = []
         for p_name in g["params"]:
-            # All params after wrapping go to _flat_param
-            params.append(param_name_mapping["_flat_param"])
+            # All params after wrapping go to '_fsdp_wrapped_module._flat_param'
+            params.append(param_name_mapping["_fsdp_wrapped_module._flat_param"])
         g["params"] = params
         optimized_params_cnt += sum([p.numel() for p in params])
 
