@@ -197,4 +197,6 @@ def main(args):
 
 if __name__ == "__main__":
     args = get_args()
+    if args.deepspeed:
+        deepspeed.init_distributed(dist_backend="nccl")
     main(args)
