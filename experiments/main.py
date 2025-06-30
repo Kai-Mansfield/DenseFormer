@@ -38,6 +38,7 @@ def get_args():
     parser.add_argument('--prepare_dataset_only', action='store_true', help='Only run prepare_dataset() then exit')
     parser.add_argument('--deepspeed', action='store_true')
     parser.add_argument('--deepspeed_config', type=str, default=None)
+    parser.add_argument('--local_rank', type=int, default=-1, help='local rank passed from distributed launcher')
     args, rem_args = parser.parse_known_args()
     return config.parse_args_with_format(format=args.config_format, base_parser=parser, args=rem_args, namespace=args)
 
