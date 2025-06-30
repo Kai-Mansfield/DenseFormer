@@ -52,6 +52,10 @@ def adjust_state_dict(state_dict, model):
 
     return state_dict
 
+def translate_model_parameter_name_for_node(self, parameter_name):
+    # For FSDP, all params map to this single flat param key
+    return ['_flat_param']
+
 def main(args): 
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
@@ -99,7 +103,10 @@ def main(args):
     # build mapping from wrapped model's named_parameters, normalized
     param_name_mapping = {}
     for p_name, p in model.named_parameters():
-        if p_name.startswith("module."):
+        # FSDP flattens params under _fsdp_wrapped_module._flat_param
+        if p_name == "_fsdp_wrapped_module._flat_param":
+            normalized_name = "_flat_param"
+        elif p_name.startswith("module."):
             normalized_name = p_name[len("module."):]
         else:
             normalized_name = p_name
@@ -109,17 +116,22 @@ def main(args):
     for name in param_name_mapping.keys():
         print(name)
 
-
     optimized_params_cnt = 0
     for g in group_specs:
         params = []
         for p_name in g["params"]:
-            # normalize translated names to lookup mapping correctly
+            # Instead of translating original param names, map all to the flat param
             translated_p_names = distributed_backend.translate_model_parameter_name_for_node(p_name)
+            # Since FSDP uses single flat param, translate method returns ['_flat_param']
             for tn in translated_p_names:
-                if tn.startswith("module."):
-                    tn = tn[len("module."):]
-                params.append(param_name_mapping[tn])
+                # normalize if necessary
+                if tn == '_flat_param':
+                    key = '_flat_param'
+                elif tn.startswith("module."):
+                    key = tn[len("module."):]
+                else:
+                    key = tn
+                params.append(param_name_mapping[key])
         g["params"] = params
         optimized_params_cnt += sum([p.numel() for p in params])
 
