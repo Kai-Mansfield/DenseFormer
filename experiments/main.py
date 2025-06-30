@@ -71,20 +71,40 @@ def main(args):
 
     print(f"Loading dataset '{args.dataset}'")
 
-    if distributed_backend.is_master_process():
-        print("RANK:", rank, 'preparing dataset')
-        prepare_dataset(args)
-        print("RANK:", rank, 'done preparing dataset')
+    if args.deepspeed:
+        import torch.distributed as dist
+
+        is_master = int(os.environ.get("RANK", 0)) == 0
+        if is_master:
+            print("RANK:", rank, "preparing dataset")
+            prepare_dataset(args)
+            print("RANK:", rank, "done preparing dataset")
+        else:
+            print("RANK:", rank, "skipping dataset preparation")
+
+        try:
+            print(f"RANK {rank} calling sync()")
+            dist.barrier()
+            print(f"RANK {rank} done syncing")
+        except Exception as e:
+            print(f"RANK {rank} error during sync: {e}")
+            raise
     else:
-        print("RANK:", rank, 'skipping dataset preparation')
-        
-    try:
-        print(f"RANK {rank} calling sync()")
-        distributed_backend.sync()
-        print(f"RANK {rank} done syncing")
-    except Exception as e:
-        print(f"RANK {rank} error during sync: {e}")
-        raise
+        # Your original logic
+        if distributed_backend.is_master_process():
+            print("RANK:", rank, "preparing dataset")
+            prepare_dataset(args)
+            print("RANK:", rank, "done preparing dataset")
+        else:
+            print("RANK:", rank, "skipping dataset preparation")
+
+        try:
+            print(f"RANK {rank} calling sync()")
+            distributed_backend.sync()
+            print(f"RANK {rank} done syncing")
+        except Exception as e:
+            print(f"RANK {rank} error during sync: {e}")
+            raise
 
     data = get_dataset(args)
     if args.data_in_ram:
