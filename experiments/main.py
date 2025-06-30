@@ -105,6 +105,11 @@ def main(args):
             normalized_name = p_name
         param_name_mapping[normalized_name] = p
 
+    print("Param names in model.named_parameters():")
+    for name in param_name_mapping.keys():
+        print(name)
+
+
     optimized_params_cnt = 0
     for g in group_specs:
         params = []
