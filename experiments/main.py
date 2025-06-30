@@ -97,20 +97,15 @@ def main(args):
     print(f"Num validation tokens: {len(data['val'])}")
 
     model = models.make_model_from_args(args).to(args.device)
+
+    # Get param group specs BEFORE wrapping — so param names are original
     group_specs = model.get_parameter_group_specs()
+
+    # Wrap the model with FSDP
     model = distributed_backend.transform_model(model)
 
-    # build mapping from wrapped model's named_parameters, normalized
-    param_name_mapping = {}
-    for p_name, p in model.named_parameters():
-        # FSDP flattens params under _fsdp_wrapped_module._flat_param
-        if p_name == "_fsdp_wrapped_module._flat_param":
-            normalized_name = "_flat_param"
-        elif p_name.startswith("module."):
-            normalized_name = p_name[len("module."):]
-        else:
-            normalized_name = p_name
-        param_name_mapping[normalized_name] = p
+    # Build mapping from wrapped model's named_parameters
+    param_name_mapping = {p_name: p for p_name, p in model.named_parameters()}
 
     print("Param names in model.named_parameters():")
     for name in param_name_mapping.keys():
@@ -120,18 +115,8 @@ def main(args):
     for g in group_specs:
         params = []
         for p_name in g["params"]:
-            # Instead of translating original param names, map all to the flat param
-            translated_p_names = distributed_backend.translate_model_parameter_name_for_node(p_name)
-            # Since FSDP uses single flat param, translate method returns ['_flat_param']
-            for tn in translated_p_names:
-                # normalize if necessary
-                if tn == '_flat_param':
-                    key = '_flat_param'
-                elif tn.startswith("module."):
-                    key = tn[len("module."):]
-                else:
-                    key = tn
-                params.append(param_name_mapping[key])
+            # All params after wrapping go to _flat_param
+            params.append(param_name_mapping["_flat_param"])
         g["params"] = params
         optimized_params_cnt += sum([p.numel() for p in params])
 
