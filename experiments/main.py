@@ -56,7 +56,7 @@ def main(args):
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
 
-    if args.deepspeed == False:
+    if not args.deepspeed:
         distributed_backend = distributed.make_backend_from_args(args)
         print(f"Using backend: {type(distributed_backend)}")
         args = distributed_backend.get_adjusted_args_for_process(args)
