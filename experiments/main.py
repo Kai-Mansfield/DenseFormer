@@ -113,6 +113,7 @@ def main(args):
             model=model,
             model_parameters=model.parameters()
         )
+        print(f"[RANK {rank}] ZeRO Stage: {model_engine.zero_optimization_stage()}")
     else:
         # Setup optimizer for non-DeepSpeed
         if args.opt == 'adamw':
