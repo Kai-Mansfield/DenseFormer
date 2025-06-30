@@ -20,6 +20,7 @@ import models
 from data.utils import get_dataset, prepare_dataset
 from optim.base import train_base
 import distributed
+import deepspeed  # NEW
 
 rank = int(os.environ.get('RANK', 0))
 local_rank = int(os.environ.get("LOCAL_RANK", 0))
@@ -35,6 +36,8 @@ def get_args():
     parser = argparse.ArgumentParser(allow_abbrev=False)
     parser.add_argument('--config_format', default='base', choices=config.registered_formats())
     parser.add_argument('--prepare_dataset_only', action='store_true', help='Only run prepare_dataset() then exit')
+    parser.add_argument('--deepspeed', action='store_true')
+    parser.add_argument('--deepspeed_config', type=str, default=None)
     args, rem_args = parser.parse_known_args()
     return config.parse_args_with_format(format=args.config_format, base_parser=parser, args=rem_args, namespace=args)
 
@@ -42,14 +45,10 @@ def get_args():
 def adjust_state_dict(state_dict, model):
     model_keys = list(model.state_dict().keys())
     ckpt_keys = list(state_dict.keys())
-
     if all(k.startswith("module.") for k in model_keys) and not any(k.startswith("module.") for k in ckpt_keys):
-        # Add "module." prefix
         state_dict = {"module." + k: v for k, v in state_dict.items()}
     elif not any(k.startswith("module.") for k in model_keys) and all(k.startswith("module.") for k in ckpt_keys):
-        # Remove "module." prefix
         state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
-
     return state_dict
 
 def main(args): 
@@ -107,19 +106,29 @@ def main(args):
         optimized_params_cnt += sum([p.numel() for p in g["params"]])
     print("number of optimized parameters: %.2fM" % (optimized_params_cnt / 1e6))
 
-    if args.opt == 'adamw':
-        use_fused = (device_type == 'cuda') and ('fused' in inspect.signature(torch.optim.AdamW).parameters)
-        print(f"using fused AdamW: {use_fused}")
-        extra_args = dict(fused=True) if use_fused else dict()
-        opt = torch.optim.AdamW(group_specs, lr=args.lr, betas=(args.beta1, args.beta2),
-                                weight_decay=args.weight_decay, **extra_args)
+    # === DeepSpeed integration ===
+    if args.deepspeed:
+        assert args.deepspeed_config is not None, "DeepSpeed config file must be specified with --deepspeed_config"
+        model_engine, optimizer, _, _ = deepspeed.initialize(
+            args=args,
+            model=model,
+            model_parameters=[p for g in group_specs for p in g["params"]],
+            config=args.deepspeed_config
+        )
     else:
-        opt = torch.optim.SGD(group_specs, lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
+        if args.opt == 'adamw':
+            use_fused = (device_type == 'cuda') and ('fused' in inspect.signature(torch.optim.AdamW).parameters)
+            print(f"using fused AdamW: {use_fused}")
+            extra_args = dict(fused=True) if use_fused else dict()
+            optimizer = torch.optim.AdamW(group_specs, lr=args.lr, betas=(args.beta1, args.beta2),
+                                          weight_decay=args.weight_decay, **extra_args)
+        else:
+            optimizer = torch.optim.SGD(group_specs, lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
 
-    if args.scheduler != 'none':
+    if args.scheduler != 'none' and not args.deepspeed:
         if args.scheduler in ['cos', 'linear']:
             scheduler = torch.optim.lr_scheduler.OneCycleLR(
-                optimizer=opt, max_lr=args.lr, total_steps=args.iterations, 
+                optimizer=optimizer, max_lr=args.lr, total_steps=args.iterations, 
                 pct_start=args.warmup_percent, anneal_strategy=args.scheduler, 
                 cycle_momentum=False, div_factor=1e2, final_div_factor=.1)
         else:
@@ -132,13 +141,9 @@ def main(args):
     if args.use_pretrained and args.use_pretrained != "none":
         print(f"Loading checkpoint from {args.use_pretrained}")
         checkpoint = torch.load(args.use_pretrained, map_location=args.device)
-        if 'model' in checkpoint:
-            state_dict = checkpoint['model']
-        else:
-            state_dict = checkpoint
+        state_dict = checkpoint['model'] if 'model' in checkpoint else checkpoint
         state_dict = adjust_state_dict(state_dict, model)
         model.load_state_dict(state_dict, strict=True)
-
         resume_iter = checkpoint.get('itr', 0)
         print(f"Resuming training from iteration {resume_iter}")
 
@@ -165,12 +170,21 @@ def main(args):
 
     print(f"\nTraining model={args.model} \n{vars(args)}\n")
 
-    stats = train(model, opt, data, scheduler, args.iterations, args.acc_steps, args.batch_size, args.sequence_length, 
-                  eval_freq=args.eval_freq,
-                  distributed_backend=distributed_backend,
-                  ckpt_path=ckpt_path,
-                  srt_iter=resume_iter,
-                  extra_args=args)
+    stats = train(
+        model_engine if args.deepspeed else model,
+        optimizer,
+        data,
+        scheduler,
+        args.iterations,
+        args.acc_steps,
+        args.batch_size,
+        args.sequence_length,
+        eval_freq=args.eval_freq,
+        distributed_backend=distributed_backend,
+        ckpt_path=ckpt_path,
+        srt_iter=resume_iter,
+        extra_args=args
+    )
 
     args.device = None
     args.dtype = None
