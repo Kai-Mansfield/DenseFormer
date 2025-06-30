@@ -139,6 +139,15 @@ def main(args):
 
     print("number of optimized parameters: %.2fM" % (optimized_params_cnt / 1e6))
 
+    resume_iter = 0
+    if args.use_pretrained and args.use_pretrained != "none":
+        print(f"Loading checkpoint from {args.use_pretrained}")
+        checkpoint = torch.load(args.use_pretrained, map_location=args.device)
+        state_dict = checkpoint['model'] if 'model' in checkpoint else checkpoint
+        model.load_state_dict(adjust_state_dict(state_dict, model), strict=True)
+        resume_iter = checkpoint.get('itr', 0)
+        print(f"Resuming training from iteration {resume_iter}")
+
     if args.deepspeed:
         assert args.deepspeed_config is not None, "DeepSpeed config file must be specified with --deepspeed_config"
         model_engine, optimizer, _, _ = deepspeed.initialize(
@@ -146,24 +155,6 @@ def main(args):
             model=model,
             model_parameters=model.parameters()
         )
-        resume_iter = 0
-        if args.use_pretrained and args.use_pretrained != "none":
-            # Check if checkpoint path is a directory (DeepSpeed checkpoint)
-            if os.path.isdir(args.use_pretrained):
-                print(f"Loading DeepSpeed checkpoint from directory {args.use_pretrained}")
-                load_success, client_state = model_engine.load_checkpoint(args.use_pretrained)
-                if not load_success:
-                    raise RuntimeError(f"Failed to load DeepSpeed checkpoint from {args.use_pretrained}")
-                resume_iter = client_state.get('itr', 0) if client_state else 0
-                print(f"Resuming training from iteration {resume_iter}")
-            else:
-                # Fallback: load plain PyTorch checkpoint file
-                print(f"Loading PyTorch checkpoint from file {args.use_pretrained}")
-                checkpoint = torch.load(args.use_pretrained, map_location=args.device)
-                state_dict = checkpoint['model'] if 'model' in checkpoint else checkpoint
-                model_engine.module.load_state_dict(adjust_state_dict(state_dict, model_engine.module), strict=True)
-                resume_iter = checkpoint.get('itr', 0)
-                print(f"Resuming training from iteration {resume_iter}")
     else:
         # Setup optimizer for non-DeepSpeed
         if args.opt == 'adamw':
