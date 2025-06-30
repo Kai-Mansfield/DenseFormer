@@ -1,37 +1,25 @@
-# Copyright 2023 Matteo Pagliardini, Amirkeivan Mohtashami, Francois Fleuret, Martin Jaggi
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 import os
 import math
 from contextlib import contextmanager
 
+import torch
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
-from torch.distributed.fsdp.wrap import default_auto_wrap_policy
 from torch.distributed.fsdp import MixedPrecision
 from torch.distributed import init_process_group, destroy_process_group, get_world_size, barrier
 
 from .backend import DistributedBackend
 
 
-class mp:
+def transformer_auto_wrap_policy(module, recurse, nonwrapped_numel):
+    from torch.nn import TransformerEncoderLayer, TransformerDecoderLayer
+    return isinstance(module, (TransformerEncoderLayer, TransformerDecoderLayer))
 
+
+class mp(DistributedBackend):
     def __init__(self, args):
         self.rank = int(os.environ.get('RANK', -1))
-        assert self.rank != -1, "DDP backend can not be used without rank"
-        assert "cuda" in args.device, "DDP backend can not be used on non-CUDA devices"
-        os.environ["TORCH_FSDP_AUTOWRAP_POLICY"] = "TRANSFORMER_BASED_WRAP"
-        os.environ["TORCH_FSDP_DEFAULT_MIN_NUM_PARAMS"] = "100000" 
+        assert self.rank != -1, "FSDP backend requires RANK"
+        assert "cuda" in args.device, "FSDP backend requires CUDA"
         init_process_group(backend=args.distributed_backend)
         self.local_rank = int(os.environ['LOCAL_RANK'])
 
@@ -40,8 +28,8 @@ class mp:
         world_size = self.get_world_size()
         if effective_batch_size % world_size != 0:
             raise ValueError(f"Effective batch size "
-                             "{effective_batch_size} is not divisible "
-                             "by the world size {world_size}.")
+                             f"{effective_batch_size} is not divisible "
+                             f"by the world size {world_size}.")
         acc_steps_div = math.gcd(args.acc_steps, world_size)
         args.acc_steps = args.acc_steps // acc_steps_div
         args.batch_size = args.batch_size // (world_size // acc_steps_div)
@@ -50,14 +38,12 @@ class mp:
         return args
 
     def transform_model(self, model):
-        fsdp_policy = default_auto_wrap_policy(model)
-        
-        mp_policy = MixedPrecision(param_dtype=torch.bfloat16)  # Optional, improves memory efficiency
-        
+        mp_policy = MixedPrecision(param_dtype=torch.bfloat16)  # Remove if not supported on your GPUs
+
         return FSDP(
             model,
-            auto_wrap_policy=fsdp_policy,
-            mixed_precision=mp_policy,  # comment out if you're unsure about bfloat16 support
+            auto_wrap_policy=transformer_auto_wrap_policy,
+            mixed_precision=mp_policy,
             device_id=torch.device(f"cuda:{self.local_rank}")
         )
 
