@@ -121,6 +121,9 @@ def main(args):
 
     if args.deepspeed:
         group_specs = model.get_parameter_group_specs()
+        param_name_mapping = {p_name: p for p_name, p in model.named_parameters()}
+        for g in group_specs:
+            g["params"] = [param_name_mapping[p_name] for p_name in g["params"]]
         optimized_params_cnt = sum(p.numel() for g in group_specs for p in g["params"])
     else:
         group_specs = distributed_backend.get_raw_model(model).get_parameter_group_specs()
