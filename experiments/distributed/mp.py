@@ -57,7 +57,9 @@ class mp(DistributedBackend):
         return self.rank == 0
 
     def get_raw_model(self, model):
-        return FSDP.unwrap(model)
+        while isinstance(model, FSDP):
+            model = model._fsdp_wrapped_module
+        return model
 
     def translate_model_parameter_name_for_node(self, parameter_name):
         return [f'module.{parameter_name}']
