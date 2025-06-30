@@ -311,6 +311,8 @@ class GPTBase(nn.Module):
         # will only return the first occurence, key'd by 'transformer.wte.weight', below.
         # so let's manually remove 'lm_head.weight' from decay set. This will include
         # this tensor into optimization via transformer.wte.weight only, and not decayed.
+        print("Decay params:", decay)
+        print("No decay params:", no_decay)
         decay.remove('lm_head.weight')
 
         # validate that we considered every parameter
