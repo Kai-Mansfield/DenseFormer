@@ -113,8 +113,7 @@ def main(args):
         model_engine, optimizer, _, _ = deepspeed.initialize(
             args=args,
             model=model,
-            model_parameters=[p for g in group_specs for p in g["params"]],
-            config=args.deepspeed_config
+            model_parameters=[p for g in group_specs for p in g["params"]]
         )
     else:
         if args.opt == 'adamw':
