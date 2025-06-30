@@ -26,7 +26,6 @@ from .utils import eval, get_batch, save_checkpoint
 
 import time
 from contextlib import nullcontext
-from utils import get_batch, eval, save_checkpoint  # assuming your utils are structured like this
 
 def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, sequence_length,
                eval_freq, ckpt_path, distributed_backend, extra_args, srt_iter=0):
