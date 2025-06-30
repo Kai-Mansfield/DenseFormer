@@ -104,21 +104,21 @@ def main(args):
     # Wrap the model with FSDP
     model = distributed_backend.transform_model(model)
 
-    # Build mapping from wrapped model's named_parameters
+    # After model is wrapped with FSDP
     param_name_mapping = {p_name: p for p_name, p in model.named_parameters()}
 
     print("Param names in model.named_parameters():")
     for name in param_name_mapping.keys():
         print(name)
 
-    optimized_params_cnt = 0
-    for g in group_specs:
-        params = []
-        for p_name in g["params"]:
-            # All params after wrapping go to '_fsdp_wrapped_module._flat_param'
-            params.append(param_name_mapping["_fsdp_wrapped_module._flat_param"])
-        g["params"] = params
-        optimized_params_cnt += sum([p.numel() for p in params])
+    # Get the single flat parameter used by FSDP
+    flat_param = param_name_mapping.get("_fsdp_wrapped_module._flat_param", None)
+    assert flat_param is not None, "FSDP flat param not found in named_parameters()"
+
+    # Create one single parameter group with the flat param
+    group_specs = [{"params": [flat_param]}]
+
+    optimized_params_cnt = flat_param.numel()
 
     print("number of optimized parameters: %.2fM" % (optimized_params_cnt / 1e6))
 
