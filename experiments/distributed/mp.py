@@ -24,7 +24,7 @@ from torch.distributed import init_process_group, destroy_process_group, get_wor
 from .backend import DistributedBackend
 
 
-class DataParallelDistributedBackend(DistributedBackend):
+class mp:
 
     def __init__(self, args):
         self.rank = int(os.environ.get('RANK', -1))
