@@ -144,6 +144,8 @@ def main(args):
         print(f"Loading checkpoint from {args.use_pretrained}")
         checkpoint = torch.load(args.use_pretrained, map_location=args.device)
         state_dict = checkpoint['model'] if 'model' in checkpoint else checkpoint
+        print("Checkpoint keys:", list(state_dict.keys()))
+        print("Model keys:", list(model.state_dict().keys()))
         model.load_state_dict(adjust_state_dict(state_dict, model), strict=True)
         resume_iter = checkpoint.get('itr', 0)
         print(f"Resuming training from iteration {resume_iter}")
