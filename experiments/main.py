@@ -20,11 +20,13 @@ from optim.base import train_base
 import distributed
 
 rank = int(os.environ.get('RANK', 0))
+local_rank = int(os.environ.get("LOCAL_RANK", 0))
 world_size = int(os.environ.get('WORLD_SIZE', 1))
 
 print("MASTER_ADDR:", os.environ.get("MASTER_ADDR"))
 print("MASTER_PORT:", os.environ.get("MASTER_PORT"))
 print("RANK:", rank)
+print("LOCAL_RANK:", local_rank)
 print("WORLD_SIZE:", world_size)
 
 def get_args():
@@ -56,7 +58,7 @@ def main(args):
     print(f"Using backend: {type(distributed_backend)}")
     args = distributed_backend.get_adjusted_args_for_process(args)
 
-    args.device = torch.device(args.device)
+    args.device = torch.device(f"cuda:{local_rank}")
     torch.cuda.set_device(args.device)
     device_type = 'cuda' if 'cuda' in str(args.device) else 'cpu'
     
