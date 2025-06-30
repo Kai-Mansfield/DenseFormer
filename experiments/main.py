@@ -69,49 +69,6 @@ def main(args):
     random.seed(args.seed)
     np.random.seed(args.seed)
 
-    print(f"Loading dataset '{args.dataset}'")
-
-    if args.deepspeed:
-        import deepspeed.comm as dist
-        is_master = int(os.environ.get("RANK", 0)) == 0
-        if is_master:
-            print("RANK:", rank, "preparing dataset")
-            prepare_dataset(args)
-            print("RANK:", rank, "done preparing dataset")
-        else:
-            print("RANK:", rank, "skipping dataset preparation")
-
-        try:
-            print(f"RANK {rank} calling sync()")
-            dist.barrier()
-            print(f"RANK {rank} done syncing")
-        except Exception as e:
-            print(f"RANK {rank} error during sync: {e}")
-            raise
-    else:
-        # Your original logic
-        if distributed_backend.is_master_process():
-            print("RANK:", rank, "preparing dataset")
-            prepare_dataset(args)
-            print("RANK:", rank, "done preparing dataset")
-        else:
-            print("RANK:", rank, "skipping dataset preparation")
-
-        try:
-            print(f"RANK {rank} calling sync()")
-            distributed_backend.sync()
-            print(f"RANK {rank} done syncing")
-        except Exception as e:
-            print(f"RANK {rank} error during sync: {e}")
-            raise
-
-    data = get_dataset(args)
-    if args.data_in_ram:
-        data = {'train': np.array(data['train']), 'val': np.array(data['val'])}
-
-    print(f"Num training tokens: {len(data['train'])}")
-    print(f"Num validation tokens: {len(data['val'])}")
-
     model = models.make_model_from_args(args).to(args.device)
     if args.deepspeed:
         pass  # DeepSpeed wraps the model below via deepspeed.initialize
@@ -177,6 +134,49 @@ def main(args):
 
             state_dict = checkpoint['model'] if 'model' in checkpoint else checkpoint
             model.load_state_dict(adjust_state_dict(state_dict, model), strict=True)
+
+    print(f"Loading dataset '{args.dataset}'")
+
+    if args.deepspeed:
+        import deepspeed.comm as dist
+        is_master = int(os.environ.get("RANK", 0)) == 0
+        if is_master:
+            print("RANK:", rank, "preparing dataset")
+            prepare_dataset(args)
+            print("RANK:", rank, "done preparing dataset")
+        else:
+            print("RANK:", rank, "skipping dataset preparation")
+
+        try:
+            print(f"RANK {rank} calling sync()")
+            dist.barrier()
+            print(f"RANK {rank} done syncing")
+        except Exception as e:
+            print(f"RANK {rank} error during sync: {e}")
+            raise
+    else:
+        # Your original logic
+        if distributed_backend.is_master_process():
+            print("RANK:", rank, "preparing dataset")
+            prepare_dataset(args)
+            print("RANK:", rank, "done preparing dataset")
+        else:
+            print("RANK:", rank, "skipping dataset preparation")
+
+        try:
+            print(f"RANK {rank} calling sync()")
+            distributed_backend.sync()
+            print(f"RANK {rank} done syncing")
+        except Exception as e:
+            print(f"RANK {rank} error during sync: {e}")
+            raise
+
+    data = get_dataset(args)
+    if args.data_in_ram:
+        data = {'train': np.array(data['train']), 'val': np.array(data['val'])}
+
+    print(f"Num training tokens: {len(data['train'])}")
+    print(f"Num validation tokens: {len(data['val'])}")
 
     if args.scheduler != 'none' and not args.deepspeed:
         if args.scheduler in ['cos', 'linear']:
