@@ -114,18 +114,26 @@ def main(args):
     print(f"Num validation tokens: {len(data['val'])}")
 
     model = models.make_model_from_args(args).to(args.device)
-    model = distributed_backend.transform_model(model)
+    if args.deepspeed:
+        pass  # DeepSpeed wraps the model below via deepspeed.initialize
+    else:
+        model = distributed_backend.transform_model(model)
 
-    group_specs = distributed_backend.get_raw_model(model).get_parameter_group_specs()
-    param_name_mapping = {p_name: p for p_name, p in model.named_parameters()}
-    optimized_params_cnt = 0
-    for g in group_specs:
-        params = []
-        for p_name in g["params"]:
-            translated_p_names = distributed_backend.translate_model_parameter_name_for_node(p_name)
-            params += [param_name_mapping[p_name] for p_name in translated_p_names]
-        g["params"] = params
-        optimized_params_cnt += sum([p.numel() for p in g["params"]])
+    if args.deepspeed:
+        group_specs = model.get_parameter_group_specs()
+        optimized_params_cnt = sum(p.numel() for g in group_specs for p in g["params"])
+    else:
+        group_specs = distributed_backend.get_raw_model(model).get_parameter_group_specs()
+        param_name_mapping = {p_name: p for p_name, p in model.named_parameters()}
+        optimized_params_cnt = 0
+        for g in group_specs:
+            params = []
+            for p_name in g["params"]:
+                translated_p_names = distributed_backend.translate_model_parameter_name_for_node(p_name)
+                params += [param_name_mapping[p_name] for p_name in translated_p_names]
+            g["params"] = params
+            optimized_params_cnt += sum([p.numel() for p in g["params"]])
+
     print("number of optimized parameters: %.2fM" % (optimized_params_cnt / 1e6))
 
     # === DeepSpeed integration ===
@@ -168,16 +176,22 @@ def main(args):
         resume_iter = checkpoint.get('itr', 0)
         print(f"Resuming training from iteration {resume_iter}")
 
-    args.world_size = distributed_backend.get_world_size()
+    if not args.deepspeed:
+        args.world_size = distributed_backend.get_world_size()
+        is_master = distributed_backend.is_master_process()
+    else:
+        args.world_size = int(os.environ.get("WORLD_SIZE", 1))
+        is_master = int(os.environ.get("RANK", 0)) == 0
+
     exp_name = args.exp_name
-    if distributed_backend.is_master_process() and args.wandb:
+    if is_master and args.wandb:
         params_copy = copy.deepcopy(vars(args))
         del params_copy['device']
         wandb.init(project=args.wandb_project, name=exp_name, config=params_copy)
 
     ckpt_path = f"{args.results_base_folder}/{args.dataset}/{args.model}"
     if not os.path.exists(ckpt_path):
-        if distributed_backend.is_master_process():
+        if is_master:
             os.makedirs(ckpt_path)
     else:
         if os.path.isfile(f"{ckpt_path}/summary.json"):
@@ -191,8 +205,10 @@ def main(args):
 
     print(f"\nTraining model={args.model} \n{vars(args)}\n")
 
+    model_for_training = model_engine if args.deepspeed else model
+
     stats = train(
-        model_engine if args.deepspeed else model,
+        model_for_training,
         optimizer,
         data,
         scheduler,
@@ -201,7 +217,7 @@ def main(args):
         args.batch_size,
         args.sequence_length,
         eval_freq=args.eval_freq,
-        distributed_backend=distributed_backend,
+        distributed_backend=distributed_backend if not args.deepspeed else None,
         ckpt_path=ckpt_path,
         srt_iter=resume_iter,
         extra_args=args
@@ -210,11 +226,14 @@ def main(args):
     args.device = None
     args.dtype = None
     stats['args'] = vars(args)
-    if distributed_backend.is_master_process():
+
+    is_master = (int(os.environ.get("RANK", 0)) == 0) if args.deepspeed else distributed_backend.is_master_process()
+    if is_master:
         with open(f"{ckpt_path}/summary.json", "w") as fs:
             json.dump(stats, fs)
-    distributed_backend.finalize()
 
+    if not args.deepspeed:
+        distributed_backend.finalize()
 
 if __name__ == "__main__":
     args = get_args()
