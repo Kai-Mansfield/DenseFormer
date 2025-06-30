@@ -150,13 +150,11 @@ def main(args):
         # Load checkpoint via DeepSpeed API after initialization
         resume_iter = 0
         if args.use_pretrained and args.use_pretrained != "none":
-            print(f"Loading checkpoint from {args.use_pretrained} using DeepSpeed load_checkpoint")
-            load_success, client_state = model_engine.load_checkpoint(args.use_pretrained)
-            if not load_success:
-                raise RuntimeError(f"Failed to load DeepSpeed checkpoint from {args.use_pretrained}")
-            resume_iter = client_state.get('itr', 0) if client_state else 0
+            checkpoint = torch.load(args.use_pretrained, map_location=args.device)
+            state_dict = checkpoint['model'] if 'model' in checkpoint else checkpoint
+            model_engine.module.load_state_dict(adjust_state_dict(state_dict, model_engine.module), strict=True)
+            resume_iter = checkpoint.get('itr', 0)
             print(f"Resuming training from iteration {resume_iter}")
-
     else:
         # Setup optimizer for non-DeepSpeed
         if args.opt == 'adamw':
