@@ -20,7 +20,7 @@ class mp(DistributedBackend):
         self.rank = int(os.environ.get('RANK', -1))
         assert self.rank != -1, "FSDP backend requires RANK"
         assert "cuda" in args.device, "FSDP backend requires CUDA"
-        init_process_group(backend=args.distributed_backend)
+        init_process_group(backend='nccl')
         self.local_rank = int(os.environ['LOCAL_RANK'])
 
     def get_adjusted_args_for_process(self, args):
