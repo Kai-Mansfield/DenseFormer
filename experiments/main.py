@@ -12,6 +12,8 @@ import random
 import wandb
 import torch._dynamo
 torch._dynamo.config.suppress_errors = True
+import logging
+logging.getLogger("torch").setLevel(logging.ERROR)
 
 import config
 import models
