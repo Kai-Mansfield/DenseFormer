@@ -56,9 +56,10 @@ def main(args):
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
 
-    distributed_backend = distributed.make_backend_from_args(args)
-    print(f"Using backend: {type(distributed_backend)}")
-    args = distributed_backend.get_adjusted_args_for_process(args)
+    if args.deepspeed == False:
+        distributed_backend = distributed.make_backend_from_args(args)
+        print(f"Using backend: {type(distributed_backend)}")
+        args = distributed_backend.get_adjusted_args_for_process(args)
 
     args.device = torch.device(f"cuda:{local_rank}")
     torch.cuda.set_device(args.device)
@@ -113,7 +114,7 @@ def main(args):
         model_engine, optimizer, _, _ = deepspeed.initialize(
             args=args,
             model=model,
-            model_parameters=[p for g in group_specs for p in g["params"]]
+            model_parameters=model.parameters()
         )
     else:
         if args.opt == 'adamw':
