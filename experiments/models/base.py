@@ -265,7 +265,9 @@ class GPTBase(nn.Module):
                 print(f"self.transformer.h[i](x, pos_emb_closure, cache_context, start_index=index_shift) at index {i}")
 
         # Step 3: move to cuda:1 (second half blocks + norm + head)
+        print("x before move", x.min(), x.max(), x.dtype)
         x = x.to("cuda:1")
+        print("x after move", x.min(), x.max(), x.dtype)
         if torch.isnan(x).any():
                 print(f"NaNs found after x.to(cuda:1)")
         pos_emb_closure = pos_emb_closure.to("cuda:1")
