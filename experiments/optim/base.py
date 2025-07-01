@@ -61,9 +61,8 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
                 if getattr(model, "needs_iter", False):
                     outputs = model(x, targets=y, iter=itr)
                 else:
-                    device = next(model.parameters()).device 
-                    x = x.to(device)
-                    y = y.to(device)
+                    x = x.to('cuda:1')
+                    y = y.to('cuda:1')
                     print('x device:', x.device)
                     print('y device:', y.device)
                     print('model params device:', next(model.parameters()).device)
