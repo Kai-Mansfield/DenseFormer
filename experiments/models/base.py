@@ -32,10 +32,18 @@ from torch.nn import functional as F
 from . import positional_encoders, caches
 
 def safe_move(x, device):
-    if x.requires_grad and x.device != device:
-        return x.detach().cpu().to(device).requires_grad_(x.requires_grad)
-    else:
+    # If x is a module (nn.Module), just call .to(device)
+    if isinstance(x, torch.nn.Module):
         return x.to(device)
+    # If x is a tensor, do the detach/cpu/to dance only if required
+    elif isinstance(x, torch.Tensor):
+        if x.requires_grad and x.device != device:
+            return x.detach().cpu().to(device).requires_grad_(x.requires_grad)
+        else:
+            return x.to(device)
+    else:
+        # fallback, e.g. for other types, just return as is or raise error
+        raise TypeError(f"safe_move expects nn.Module or Tensor, got {type(x)}")
 
 class LayerNorm(nn.Module):
     """ LayerNorm but with an optional bias. PyTorch doesn't support simply bias=False """
