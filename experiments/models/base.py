@@ -403,6 +403,7 @@ class GPTBase(nn.Module):
         # this tensor into optimization via transformer.wte.weight only, and not decayed.
         if 'lm_head.weight' in decay:
             decay.remove('lm_head.weight')
+            no_decay.add('lm_head.weight')
 
         # validate that we considered every parameter
         param_dict = {pn: p for pn, p in self.named_parameters()}
