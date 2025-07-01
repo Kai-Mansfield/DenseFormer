@@ -63,7 +63,7 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
                 else:
                     print('x device:', x.device)
                     print('y device:', y.device)
-                    print('model params device:', model.parameters().device)
+                    print('model params device:', next(model.parameters()).device)
                     outputs = model(x, targets=y)
 
             loss = outputs['loss']
