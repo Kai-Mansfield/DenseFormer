@@ -274,10 +274,13 @@ class GPTBase(nn.Module):
             logits = self.lm_head(x)
             targets = targets.to(logits.device)  # move targets to logits device
             print("Logits size:", logits.size())
-            print('logits device:', logits.device)
             print('tragets size:', targets.size())
+            print('logits device:', logits.device)
             print('targets device:', targets.device)
             print(f"  max: {logits.max().item():.4f}")
+            topk_vals, topk_indices = logits.topk(k=5, dim=-1)  # top 5 predicted classes per position
+            print("Top 5 predicted class indices for first batch element, first token position:", topk_indices[0,0])
+            print("Top 5 predicted scores for first batch element, first token position:", topk_vals[0,0])
             loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
         else:
             logits = self.lm_head(x[:, [-1], :])
