@@ -272,11 +272,12 @@ class GPTBase(nn.Module):
 
         if targets is not None:
             logits = self.lm_head(x)
+            targets = targets.to(logits.device)  # move targets to logits device
             print("Logits size:", logits.size())
             print('logits device:', logits.device)
             print('tragets size:', targets.size())
-            targets = targets.to(logits.device)  # move targets to logits device
             print('targets device:', targets.device)
+            print(f"  max: {logits.max().item():.4f}")
             loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
         else:
             logits = self.lm_head(x[:, [-1], :])
