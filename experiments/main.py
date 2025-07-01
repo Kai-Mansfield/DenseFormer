@@ -107,7 +107,7 @@ def main(args):
     print(f"Num validation tokens: {len(data['val'])}")
 
     model = models.make_model_from_args(args)
-    #model = distributed_backend.transform_model(model)
+    model = distributed_backend.transform_model(model)
 
     group_specs = model.get_parameter_group_specs()
     param_name_mapping = {p_name: p for p_name, p in model.named_parameters()}
