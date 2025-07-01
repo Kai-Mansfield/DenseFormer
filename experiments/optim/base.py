@@ -67,6 +67,15 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
                     print('x device:', x.device)
                     print('y device:', y.device)
                     print('model params device:', next(model.parameters()).device)
+                    if torch.isnan(x).any():
+                        print("Input x contains NaNs!")
+                    else:
+                        print("Input x has no NaNs.")
+
+                    if torch.isnan(y).any():
+                        print("Target y contains NaNs!")
+                    else:
+                        print("Target y has no NaNs.")
                     outputs = model(x, targets=y)
 
             loss = outputs['loss']
