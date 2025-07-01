@@ -307,7 +307,7 @@ class GPTBase(nn.Module):
                 print(f"NaNs found in output of block {i}")
 
         x = safe_move(x, "cuda:1")
-        print("x after move", x.min(), x.max(), x.dtype)
+        #print("x after move", x.min(), x.max(), x.dtype)
         if torch.isnan(x).any():
                 print(f"NaNs found after x.to(cuda:1)")
         pos_emb_closure = safe_move(pos_emb_closure, "cuda:1")
