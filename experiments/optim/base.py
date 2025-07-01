@@ -49,11 +49,11 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
         for microstep_idx in range(acc_steps):  # gradient accumulation
             x, y = get_batch(data['train'], sequence_length, batch_size, device=extra_args.device)
 
-            y_cpu = y.cpu()  # move targets to CPU to safely check values
+            print("Target min/max:", y.cpu().min().item(), y.cpu().max().item())
 
-            if torch.any(y_cpu < 0):
+            if torch.any(y.cpu() < 0):
                 print("Warning: targets contain negative indices")
-            if torch.any(y_cpu >= model.config.vocab_size):
+            if torch.any(y.cpu() >= model.config.vocab_size):
                 print(f"Warning: targets contain indices >= vocab_size ({model.config.vocab_size})")
             with type_ctx:
                 if getattr(model, "needs_iter", False):
