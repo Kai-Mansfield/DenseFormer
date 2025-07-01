@@ -51,9 +51,10 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
 
             print("Target min/max:", y.cpu().min().item(), y.cpu().max().item())
             print("Unique target values:", torch.unique(y.cpu()))
+            print('vocab size:', model.config.vocab_size)
 
-            if torch.any(y.cpu() < 0):
-                print("Warning: targets contain negative indices")
+            if torch.any(y.cpu() >= 50304) or torch.any(y.cpu() < -1):
+                print("Found out-of-range targets!")
             if torch.any(y.cpu() >= model.config.vocab_size):
                 print(f"Warning: targets contain indices >= vocab_size ({model.config.vocab_size})")
             with type_ctx:
