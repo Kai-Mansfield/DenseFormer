@@ -50,6 +50,7 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
             x, y = get_batch(data['train'], sequence_length, batch_size, device=extra_args.device)
 
             print("Target min/max:", y.cpu().min().item(), y.cpu().max().item())
+            print("Unique target values:", torch.unique(y.cpu()))
 
             if torch.any(y.cpu() < 0):
                 print("Warning: targets contain negative indices")
