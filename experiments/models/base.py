@@ -270,6 +270,8 @@ class GPTBase(nn.Module):
         if use_cache:
             x = self.lm_cache.get_final_logits(x)
 
+        if torch.isnan(x).any():
+            print(f"NaNs in line 274")
         if targets is not None:
             logits = self.lm_head(x)
             print(self.lm_head.weight.mean().item(), self.lm_head.weight.std().item())
