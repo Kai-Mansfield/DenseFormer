@@ -32,15 +32,14 @@ from torch.nn import functional as F
 from . import positional_encoders, caches
 
 def safe_move(x, device):
-    # If x is a module (nn.Module), just call .to(device)
-    if isinstance(x, torch.nn.Module) or hasattr(x, 'to'):
-        return x.to(device)
-    # If x is a tensor, do the detach/cpu/to dance only if required
-    elif isinstance(x, torch.Tensor):
+    if isinstance(x, torch.Tensor):
         if x.requires_grad and x.device != device:
             return x.detach().cpu().to(device).requires_grad_(x.requires_grad)
         else:
             return x.to(device)
+    # If x is a module (nn.Module), just call .to(device)
+    elif isinstance(x, torch.nn.Module) or hasattr(x, 'to'):
+        return x.to(device)
     else:
         # fallback, e.g. for other types, just return as is or raise error
         raise TypeError(f"safe_move expects nn.Module or Tensor, got {type(x)}")
