@@ -252,9 +252,9 @@ class GPTBase(nn.Module):
 
         tok_emb = self.transformer.wte(idx)
         x = pos_emb_closure.adapt_model_input(tok_emb, start_index=index_shift)
+        x = self.transformer.drop(x)
         if torch.isnan(x).any():
             print(f"NaNs found in x")
-        x = self.transformer.drop(x)
 
         mid = self.config.n_layer // 2
         for i in range(mid):
