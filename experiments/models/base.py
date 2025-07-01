@@ -261,18 +261,28 @@ class GPTBase(nn.Module):
         mid = self.config.n_layer // 2
         for i in range(mid):
             x = self.transformer.h[i](x, pos_emb_closure, cache_context, start_index=index_shift)
+            if torch.isnan(x).any():
+                print(f"self.transformer.h[i](x, pos_emb_closure, cache_context, start_index=index_shift) at index {i}")
 
         # Step 3: move to cuda:1 (second half blocks + norm + head)
         x = x.to("cuda:1")
+        if torch.isnan(x).any():
+                print(f"NaNs found after x.to(cuda:1)")
         pos_emb_closure = pos_emb_closure.to("cuda:1")
 
         for i in range(mid, self.config.n_layer):
             x = self.transformer.h[i](x, pos_emb_closure, cache_context, start_index=index_shift)
+        if torch.isnan(x).any():
+            print('nans found after second half of transformer blocks')
 
         x = self.transformer.ln_f(x)
+        if torch.isnan(x).any():
+            print(f"NaNs found after self.transformer.ln_f(x)")
 
         if use_cache:
             x = self.lm_cache.get_final_logits(x)
+        if torch.isnan(x).any():
+            print(f"NaNs found after self.lm_cache.get_final_logits(x)")
 
         if targets is not None:
             logits = self.lm_head(x)
