@@ -47,7 +47,11 @@ class PositionalEncoderClosure(object):
 
     def _adapt_attention_before_softmax_for_indices(self, att, query_indices, key_indices):
         return att
-    
+
+    def to(self, device):
+        # Move the encoder module to the target device
+        self.encoder = self.encoder.to(device)
+        return self
 
 class PositionalEncoder(nn.Module):
 
