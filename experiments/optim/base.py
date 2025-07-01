@@ -61,6 +61,8 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
                 if getattr(model, "needs_iter", False):
                     outputs = model(x, targets=y, iter=itr)
                 else:
+                    print('x device:', x.device)
+                    print('y device:', y.device)
                     outputs = model(x, targets=y)
 
             loss = outputs['loss']
