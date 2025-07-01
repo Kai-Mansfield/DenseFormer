@@ -273,7 +273,8 @@ class GPTBase(nn.Module):
         if targets is not None:
             logits = self.lm_head(x)
             print(self.lm_head.weight.mean().item(), self.lm_head.weight.std().item())
-            targets = targets.to(logits.device) 
+            targets = targets.to('cuda:0')  
+            logits = logits.to('cuda:0')  
             print('self.lm_head.weight.device', self.lm_head.weight.device)  # ensure targets are on the same device as lm_head 
             print("Logits size:", logits.size())
             print('tragets size:', targets.size())
