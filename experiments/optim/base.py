@@ -26,7 +26,7 @@ from .utils import eval, get_batch, save_checkpoint
 
 def safe_move(x, device):
     # If x is a module (nn.Module), just call .to(device)
-    if isinstance(x, torch.nn.Module):
+    if isinstance(x, torch.nn.Module) or hasattr(x, 'to'):
         return x.to(device)
     # If x is a tensor, do the detach/cpu/to dance only if required
     elif isinstance(x, torch.Tensor):
