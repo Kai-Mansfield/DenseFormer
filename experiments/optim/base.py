@@ -85,6 +85,7 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
                     print(f"NaN detected in parameter: {name}")
                 if torch.isinf(param).any():
                     print(f"Inf detected in parameter: {name}")
+            print('finished cheking for inf and nans in parameters')
             substep += 1
 
         if extra_args.grad_clip != 0.0:
