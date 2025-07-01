@@ -172,10 +172,34 @@ class Block(nn.Module):
         self.mlp = MLP(config)
 
     def forward(self, x, pos_emb_closure, cache_context, start_index):
-        x = x + self.attn(self.ln_1(x), pos_emb_closure, cache_context, start_index)
-        x = x + self.mlp(self.ln_2(x))
+        if torch.isnan(x).any():
+            print("NaNs before Block")
+
+        x_ln1 = self.ln_1(x)
+        if torch.isnan(x_ln1).any():
+            print("NaNs after ln_1")
+
+        x_attn = self.attn(x_ln1, pos_emb_closure, cache_context, start_index)
+        if torch.isnan(x_attn).any():
+            print("NaNs after attn")
+
+        x = x + x_attn
+        if torch.isnan(x).any():
+            print("NaNs after attn residual")
+
+        x_ln2 = self.ln_2(x)
+        if torch.isnan(x_ln2).any():
+            print("NaNs after ln_2")
+
+        x_mlp = self.mlp(x_ln2)
+        if torch.isnan(x_mlp).any():
+            print("NaNs after mlp")
+
+        x = x + x_mlp
+        if torch.isnan(x).any():
+            print("NaNs after mlp residual")
+
         return x
-    
 
 class GPTBase(nn.Module):
     needs_iter = False
