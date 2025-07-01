@@ -16,7 +16,7 @@ def main():
     
     # Move tensor x to cuda:1
     torch.cuda.synchronize(0)
-    x1 = x.to('cuda:1')
+    x1 = x.detach().cpu().to("cuda:1").requires_grad_(x.requires_grad)
     torch.cuda.synchronize(1)
     
     print("\nTensor x moved to cuda:1:")
