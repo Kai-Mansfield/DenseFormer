@@ -274,8 +274,10 @@ class GPTBase(nn.Module):
         mid = self.config.n_layer // 2
         for i in range(mid):
             x = self.transformer.h[i](x, pos_emb_closure, cache_context, start_index=index_shift)
+            if torch.isnan(self.transformer.h[i]).any():
+                print(f"nans found in self.transformer.h[{i}]")
             if torch.isnan(x).any():
-                print(f"self.transformer.h[i](x, pos_emb_closure, cache_context, start_index=index_shift) at index {i}")
+                print(f"nans found self.transformer.h[i](x, pos_emb_closure, cache_context, start_index=index_shift) at index {i}")
 
         x = safe_move(x, "cuda:1")
         print("x after move", x.min(), x.max(), x.dtype)
