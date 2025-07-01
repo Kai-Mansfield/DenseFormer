@@ -166,9 +166,7 @@ class Block(nn.Module):
     
 
 class GPTBase(nn.Module):
-
     needs_iter = False
-
     def __init__(self, config):
         super().__init__()
         assert config.vocab_size is not None
@@ -178,30 +176,42 @@ class GPTBase(nn.Module):
 
         self.lm_cache = caches.get_cache(config.lm_cache)(config)
 
+        num_layers = config.n_layer
+        mid = num_layers // 2  # Split point for model parallelism
+
+        # === Split model components across cuda:0 and cuda:1 ===
         self.transformer = nn.ModuleDict(dict(
-            wte = nn.Embedding(config.vocab_size, config.n_embd),
-            wpe = positional_encoders.get_encoder(config.positional_encoder)(config),
-            drop = nn.Dropout(config.dropout),
-            h = nn.ModuleList([Block(config, self.lm_cache) for _ in range(config.n_layer)]),
-            ln_f = LayerNorm(config.n_embd, bias=config.bias),
+            # Device 0: embeddings and first half of layers
+            wte = nn.Embedding(config.vocab_size, config.n_embd).to("cuda:0"),
+            wpe = positional_encoders.get_encoder(config.positional_encoder)(config).to("cuda:0"),
+            drop = nn.Dropout(config.dropout).to("cuda:0"),
+
+            # Transformer blocks split across two devices
+            h = nn.ModuleList([
+                Block(config, self.lm_cache).to("cuda:0") if i < mid else Block(config, self.lm_cache).to("cuda:1")
+                for i in range(num_layers)
+            ]),
+
+            # Device 1: final layer norm
+            ln_f = LayerNorm(config.n_embd, bias=config.bias).to("cuda:1"),
         ))
 
-        self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
-        # with weight tying when using torch.compile() some warnings get generated:
-        # "UserWarning: functional_call was passed multiple values for tied weights.
-        # This behavior is deprecated and will be an error in future versions"
-        # not 100% sure what this is, so far seems to be harmless. TODO investigate
-        self.transformer.wte.weight = self.lm_head.weight # https://paperswithcode.com/method/weight-tying
+        # Device 1: language modeling head
+        self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False).to("cuda:1")
 
-        # init all weights
+        # self.transformer.wte = self.transformer.wte.to("cuda:1")
+        # self.lm_head = self.lm_head.to("cuda:1")
+        #self.transformer.wte.weight = self.lm_head.weight
+
+        # Initialize all weights
         self.apply(self._init_weights)
-        # apply special scaled init to the residual projections, per GPT-2 paper
+
+        # Scaled init for residual projections
         for pn, p in self.named_parameters():
             if pn.endswith('c_proj.weight'):
-                torch.nn.init.normal_(p, mean=0.0, std=0.02/math.sqrt(2 * config.n_layer))
+                torch.nn.init.normal_(p, mean=0.0, std=0.02 / math.sqrt(2 * config.n_layer))
 
-        # report number of parameters
-        print("number of parameters: %.2fM" % (self.get_num_params()/1e6,))
+        print("number of parameters: %.2fM" % (self.get_num_params() / 1e6,))
 
     def get_num_params(self, non_embedding=True):
         """
@@ -224,38 +234,50 @@ class GPTBase(nn.Module):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
     def forward(self, idx, targets=None, get_logits=False, use_cache=False, iter=None):
-        device = idx.device
         b, t = idx.size()
         assert t <= self.config.sequence_length, f"Cannot forward sequence of length {t}, block size is only {self.config.sequence_length}"
-        
-        
-        # forward the GPT model itself
+
+        # Step 1: cache lookup (always on cpu/cuda:0, same as idx)
         if use_cache:
             idx, index_shift, cache_context = self.lm_cache(idx)
         else:
             index_shift = 0
             cache_context = None
+
+        # Step 2: run on cuda:0 (embeddings + first half blocks)
+        idx = idx.to("cuda:0")
         if getattr(self.transformer.wpe, "needs_iter", False):
-            idx, pos_emb_closure = self.transformer.wpe(idx, iter=iter) # position embeddings of shape (1, t, n_embd)
+            idx, pos_emb_closure = self.transformer.wpe(idx, iter=iter)
         else:
-            idx, pos_emb_closure = self.transformer.wpe(idx) # position embeddings of shape (1, t, n_embd)
-        tok_emb = self.transformer.wte(idx) # token embeddings of shape (b, t, n_embd)
+            idx, pos_emb_closure = self.transformer.wpe(idx)
+
+        tok_emb = self.transformer.wte(idx)
         x = pos_emb_closure.adapt_model_input(tok_emb, start_index=index_shift)
         x = self.transformer.drop(x)
-        for block in self.transformer.h:
-            x = block(x, pos_emb_closure, cache_context, start_index=index_shift)
+
+        mid = self.config.n_layer // 2
+        for i in range(mid):
+            x = self.transformer.h[i](x, pos_emb_closure, cache_context, start_index=index_shift)
+
+        # Step 3: move to cuda:1 (second half blocks + norm + head)
+        x = x.to("cuda:1")
+        pos_emb_closure = pos_emb_closure.to("cuda:1")
+
+        for i in range(mid, self.config.n_layer):
+            x = self.transformer.h[i](x, pos_emb_closure, cache_context, start_index=index_shift)
+
         x = self.transformer.ln_f(x)
 
         if use_cache:
             x = self.lm_cache.get_final_logits(x)
+
         if targets is not None:
-            # if we are given some desired targets also calculate the loss
             logits = self.lm_head(x)
-            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
+            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1).to(logits.device), ignore_index=-1)
         else:
-            # inference-time mini-optimization: only forward the lm_head on the very last position
-            logits = self.lm_head(x[:, [-1], :]) # note: using list [-1] to preserve the time dim
+            logits = self.lm_head(x[:, [-1], :])
             loss = None
+
         logits = logits if get_logits else None
         return {'logits': logits, 'loss': loss}
 

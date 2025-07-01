@@ -49,11 +49,10 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
         for microstep_idx in range(acc_steps):  # gradient accumulation
             x, y = get_batch(data['train'], sequence_length, batch_size, device=extra_args.device)
             with type_ctx:
-                with distributed_backend.get_context_for_microstep_forward(model=model, microstep_idx=microstep_idx, gradient_accumulation_steps=acc_steps):
-                    if getattr(distributed_backend.get_raw_model(model), "needs_iter", False):
-                        outputs = model(x, targets=y, iter=itr)
-                    else:
-                        outputs = model(x, targets=y)
+                if getattr(model, "needs_iter", False):
+                    outputs = model(x, targets=y, iter=itr)
+                else:
+                    outputs = model(x, targets=y)
 
             loss = outputs['loss']
             loss.backward()
@@ -68,7 +67,7 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
         itr += 1
 
         if itr % eval_freq == 0 or itr == iterations: # from here it's only evaluation code, all the training is above
-            if distributed_backend.is_master_process():
+            if True:
                 t1 = time.time()
                 dt = t1 - t0
                 epoch = substep//num_substeps_per_epoch
@@ -97,7 +96,7 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
 
                 model.train()
                 t0 = time.time()
-        if distributed_backend.is_master_process():
+        if True:
             if extra_args.save_checkpoint_freq is not None and itr % extra_args.save_checkpoint_freq == 0:
                 print(f"saving checkpoint to {ckpt_path}/ckpt.pt")
                 save_checkpoint(distributed_backend=distributed_backend,
@@ -107,13 +106,13 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
                                 itr=itr,
                                 ckpt_path=f"{ckpt_path}/ckpt.pt")
 
-    if distributed_backend.is_master_process():
+    if True:
         print(f"saving checkpoint to {ckpt_path}")
-        save_checkpoint(distributed_backend=distributed_backend,
-                        model=model,
-                        opt=opt,
-                        scheduler=scheduler,
-                        itr=itr,
-                        ckpt_path=f"{ckpt_path}/ckpt.pt")
+        torch.save({
+            'model': model.state_dict(),
+            'opt': opt.state_dict(),
+            'scheduler': scheduler.state_dict() if scheduler else None,
+            'itr': itr
+        }, f"{ckpt_path}/ckpt.pt")
 
     return stats

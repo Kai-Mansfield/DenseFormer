@@ -92,17 +92,18 @@ def main(args):
     print(f"Num training tokens: {len(data['train'])}")
     print(f"Num validation tokens: {len(data['val'])}")
 
-    model = models.make_model_from_args(args).to(args.device)
-    model = distributed_backend.transform_model(model)
+    model = models.make_model_from_args(args)
+    #model = distributed_backend.transform_model(model)
 
-    group_specs = distributed_backend.get_raw_model(model).get_parameter_group_specs()
+    group_specs = model.get_parameter_group_specs()
     param_name_mapping = {p_name: p for p_name, p in model.named_parameters()}
     optimized_params_cnt = 0
     for g in group_specs:
         params = []
         for p_name in g["params"]:
-            translated_p_names = distributed_backend.translate_model_parameter_name_for_node(p_name)
-            params += [param_name_mapping[p_name] for p_name in translated_p_names]
+            # If you have any translation needed for param names in your setup, do it here,
+            # but often for model parallelism you can skip this:
+            params.append(param_name_mapping[p_name])
         g["params"] = params
         optimized_params_cnt += sum([p.numel() for p in g["params"]])
     print("number of optimized parameters: %.2fM" % (optimized_params_cnt / 1e6))
