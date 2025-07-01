@@ -272,7 +272,8 @@ class GPTBase(nn.Module):
 
         if targets is not None:
             logits = self.lm_head(x)
-            targets = targets.to(logits.device)  # move targets to logits device
+            #targets = targets.to(logits.device)
+            logits = logits.to(targets.device)  
             print("Logits size:", logits.size())
             print('tragets size:', targets.size())
             print('logits device:', logits.device)
