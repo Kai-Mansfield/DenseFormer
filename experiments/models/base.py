@@ -252,6 +252,8 @@ class GPTBase(nn.Module):
 
         tok_emb = self.transformer.wte(idx)
         x = pos_emb_closure.adapt_model_input(tok_emb, start_index=index_shift)
+        if torch.isnan(x).any():
+            print(f"NaNs found in x")
         x = self.transformer.drop(x)
 
         mid = self.config.n_layer // 2
@@ -270,8 +272,6 @@ class GPTBase(nn.Module):
         if use_cache:
             x = self.lm_cache.get_final_logits(x)
 
-        if torch.isnan(x).any():
-            print(f"NaNs in line 274")
         if targets is not None:
             logits = self.lm_head(x)
             print(self.lm_head.weight.mean().item(), self.lm_head.weight.std().item())
@@ -285,13 +285,8 @@ class GPTBase(nn.Module):
             topk_vals, topk_indices = logits.topk(k=5, dim=-1)  # top 5 predicted classes per position
             print("Top 5 predicted class indices for first batch element, first token position:", topk_indices[0,0])
             print("Top 5 predicted scores for first batch element, first token position:", topk_vals[0,0])
-            print("Logits stats before loss:")
-            print("min:", torch.min(logits).item())
-            print("max:", torch.max(logits).item())
-            print("mean:", torch.mean(logits).item())
             print("isnan:", torch.isnan(logits).any().item())
             print("isinf:", torch.isinf(logits).any().item())
-            print('logits', logits)
             loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
         else:
             logits = self.lm_head(x[:, [-1], :])
