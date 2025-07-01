@@ -31,6 +31,11 @@ from torch.nn import functional as F
 
 from . import positional_encoders, caches
 
+def pos_to(self, device):
+    self.cos = self.cos.to(device)
+    self.sin = self.sin.to(device)
+    self.rotary_dim = self.rotary_dim  # leave scalar as-is
+    return self
 
 class LayerNorm(nn.Module):
     """ LayerNorm but with an optional bias. PyTorch doesn't support simply bias=False """
@@ -261,7 +266,7 @@ class GPTBase(nn.Module):
 
         # Step 3: move to cuda:1 (second half blocks + norm + head)
         x = x.to("cuda:1")
-        pos_emb_closure = pos_emb_closure.to("cuda:1")
+        pos_emb_closure = pos_emb_closure.pos_to("cuda:1")
 
         for i in range(mid, self.config.n_layer):
             x = self.transformer.h[i](x, pos_emb_closure, cache_context, start_index=index_shift)
