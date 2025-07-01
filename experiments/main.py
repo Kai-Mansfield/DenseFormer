@@ -31,6 +31,12 @@ print("RANK:", rank)
 print("LOCAL_RANK:", local_rank)
 print("WORLD_SIZE:", world_size)
 
+def safe_move(x, device):
+    if x.requires_grad and x.device != device:
+        return x.detach().cpu().to(device).requires_grad_(x.requires_grad)
+    else:
+        return x.to(device)
+
 def get_args():
     parser = argparse.ArgumentParser(allow_abbrev=False)
     parser.add_argument('--config_format', default='base', choices=config.registered_formats())

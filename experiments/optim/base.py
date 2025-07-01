@@ -24,6 +24,12 @@ import sys
 
 from .utils import eval, get_batch, save_checkpoint
 
+def safe_move(x, device):
+    if x.requires_grad and x.device != device:
+        return x.detach().cpu().to(device).requires_grad_(x.requires_grad)
+    else:
+        return x.to(device)
+
 def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, sequence_length, eval_freq, ckpt_path, distributed_backend, extra_args, srt_iter=0):
     device_type = 'cuda' if 'cuda' in str(extra_args.device) else 'cpu'
     type_ctx = nullcontext() if device_type == 'cpu' else torch.amp.autocast(

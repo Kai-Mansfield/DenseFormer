@@ -31,6 +31,12 @@ from torch.nn import functional as F
 
 from . import positional_encoders, caches
 
+def safe_move(x, device):
+    if x.requires_grad and x.device != device:
+        return x.detach().cpu().to(device).requires_grad_(x.requires_grad)
+    else:
+        return x.to(device)
+
 class LayerNorm(nn.Module):
     """ LayerNorm but with an optional bias. PyTorch doesn't support simply bias=False """
 
@@ -181,22 +187,22 @@ class GPTBase(nn.Module):
         # === Split model components across cuda:0 and cuda:1 ===
         self.transformer = nn.ModuleDict(dict(
             # Device 0: embeddings and first half of layers
-            wte = nn.Embedding(config.vocab_size, config.n_embd).to("cuda:0"),
-            wpe = positional_encoders.get_encoder(config.positional_encoder)(config).to("cuda:0"),
-            drop = nn.Dropout(config.dropout).to("cuda:0"),
+            wte = safe_move(nn.Embedding(config.vocab_size, config.n_embd), "cuda:0"),
+            wpe = safe_move(positional_encoders.get_encoder(config.positional_encoder)(config), "cuda:0"),
+            drop = safe_move(nn.Dropout(config.dropout), "cuda:0"),
 
             # Transformer blocks split across two devices
             h = nn.ModuleList([
-                Block(config, self.lm_cache).to("cuda:0") if i < mid else Block(config, self.lm_cache).to("cuda:1")
+                safe_move(Block(config, self.lm_cache), "cuda:0") if i < mid else safe_move(Block(config, self.lm_cache), "cuda:1")
                 for i in range(num_layers)
             ]),
 
             # Device 1: final layer norm
-            ln_f = LayerNorm(config.n_embd, bias=config.bias).to("cuda:1"),
+            ln_f = safe_move(LayerNorm(config.n_embd, bias=config.bias), "cuda:1"),
         ))
 
         # Device 1: language modeling head
-        self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False).to("cuda:1")
+        self.lm_head = safe_move(nn.Linear(config.n_embd, config.vocab_size, bias=False), "cuda:1")
 
         # self.transformer.wte = self.transformer.wte.to("cuda:1")
         # self.lm_head = self.lm_head.to("cuda:1")
@@ -244,7 +250,7 @@ class GPTBase(nn.Module):
             cache_context = None
 
         # Step 2: run on cuda:0 (embeddings + first half blocks)
-        idx = idx.to("cuda:0")
+        idx = safe_move(idx, "cuda:0")
         if getattr(self.transformer.wpe, "needs_iter", False):
             idx, pos_emb_closure = self.transformer.wpe(idx, iter=iter)
         else:
@@ -264,17 +270,11 @@ class GPTBase(nn.Module):
             if torch.isnan(x).any():
                 print(f"self.transformer.h[i](x, pos_emb_closure, cache_context, start_index=index_shift) at index {i}")
 
-        # Step 3: move to cuda:1 (second half blocks + norm + head)
-        print(torch.cuda.memory_summary("cuda:1"))
-        print("x before move", x.min(), x.max(), x.dtype)
-        torch.cuda.synchronize()
-        x = x.to("cuda:1", non_blocking=False)
-        torch.cuda.synchronize()
-        print(torch.cuda.memory_summary("cuda:1"))
+        x = safe_move(x, "cuda:1")
         print("x after move", x.min(), x.max(), x.dtype)
         if torch.isnan(x).any():
                 print(f"NaNs found after x.to(cuda:1)")
-        pos_emb_closure = pos_emb_closure.to("cuda:1")
+        pos_emb_closure = safe_move(pos_emb_closure, "cuda:1")
 
         for i in range(mid, self.config.n_layer):
             x = self.transformer.h[i](x, pos_emb_closure, cache_context, start_index=index_shift)
@@ -293,8 +293,8 @@ class GPTBase(nn.Module):
         if targets is not None:
             logits = self.lm_head(x)
             print(self.lm_head.weight.mean().item(), self.lm_head.weight.std().item())
-            targets = targets.to('cuda:0')  
-            logits = logits.to('cuda:0')  
+            targets = safe_move(targets, 'cuda:0')  
+            logits = safe_move(logits, 'cuda:0')  
             print('self.lm_head.weight.device', self.lm_head.weight.device)  # ensure targets are on the same device as lm_head 
             print("Logits size:", logits.size())
             print('tragets size:', targets.size())
@@ -412,6 +412,6 @@ class GPTBase(nn.Module):
     
     @torch.no_grad()
     def generate_from_string(self, in_str, max_new_tokens, temperature=1.0, top_k=None):
-        idx = torch.tensor(self.tokenizer.encode(in_str, allowed_special={"<|endoftext|>"})).view(1,-1).to(self.lm_head.weight.device)
+        idx = safe_move(torch.tensor(self.tokenizer.encode(in_str, allowed_special={"<|endoftext|>"})).view(1,-1), self.lm_head.weight.device)
         out_idx = self.generate(idx, max_new_tokens, temperature, top_k).view(-1).to('cpu').numpy()
         return self.tokenizer.decode(out_idx)
