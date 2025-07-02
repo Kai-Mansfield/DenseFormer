@@ -327,6 +327,7 @@ class GPTBase(nn.Module):
             print(f"NaNs found after self.lm_cache.get_final_logits(x)")
 
         if targets is not None:
+            x = safe_move(x, "cuda:0")
             logits = self.lm_head(x)
             # print(self.lm_head.weight.mean().item(), self.lm_head.weight.std().item())
             targets = safe_move(targets, 'cuda:0')  
