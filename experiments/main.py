@@ -60,6 +60,7 @@ def main(args):
     print(f"Using backend: {type(distributed_backend)}")
     args = distributed_backend.get_adjusted_args_for_process(args)
 
+    print('args.device', args.device)
     args.device = torch.device(f"cuda:{local_rank}")
     torch.cuda.set_device(args.device)
     device_type = 'cuda' if 'cuda' in str(args.device) else 'cpu'
