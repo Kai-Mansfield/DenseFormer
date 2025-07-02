@@ -218,7 +218,7 @@ class GPTBase(nn.Module):
         # === Split model components across cuda:0 and cuda:1 ===
         self.transformer = nn.ModuleDict(dict(
             # Device 0: embeddings and first half of layers
-            wte = safe_move(nn.Embedding(config.vocab_size, config.n_embd), "cuda:1"),
+            wte = safe_move(nn.Embedding(config.vocab_size, config.n_embd), "cuda:0"),
             wpe = safe_move(positional_encoders.get_encoder(config.positional_encoder)(config), "cuda:0"),
             drop = safe_move(nn.Dropout(config.dropout), "cuda:0"),
 
@@ -233,7 +233,7 @@ class GPTBase(nn.Module):
         ))
 
         # Device 1: language modeling head
-        self.lm_head = safe_move(nn.Linear(config.n_embd, config.vocab_size, bias=False), "cuda:1")
+        self.lm_head = safe_move(nn.Linear(config.n_embd, config.vocab_size, bias=False), "cuda:0")
 
         # self.transformer.wte = self.transformer.wte.to("cuda:1")
         # self.lm_head = self.lm_head.to("cuda:1")
