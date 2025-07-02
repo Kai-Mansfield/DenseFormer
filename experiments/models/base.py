@@ -233,11 +233,11 @@ class GPTBase(nn.Module):
         ))
 
         # Device 1: language modeling head
-        self.lm_head = safe_move(nn.Linear(config.n_embd, config.vocab_size, bias=False), "cuda:1")
+        self.lm_head = safe_move(nn.Linear(config.n_embd, config.vocab_size, bias=False), "cuda:0")
 
         # self.transformer.wte = self.transformer.wte.to("cuda:1")
         # self.lm_head = self.lm_head.to("cuda:1")
-        #self.transformer.wte.weight = self.lm_head.weight
+        self.transformer.wte.weight = self.lm_head.weight
 
         # Initialize all weights
         self.apply(self._init_weights)
