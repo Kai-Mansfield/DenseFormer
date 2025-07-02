@@ -337,8 +337,8 @@ class GPTBase(nn.Module):
             x = self.lm_cache.get_final_logits(x)
         if torch.isnan(x).any():
             print(f"NaNs found after self.lm_cache.get_final_logits(x)")
-        print("x min:", x.min().item())
-        print("x max:", x.max().item())
+        # print("x min:", x.min().item())
+        # print("x max:", x.max().item())
 
         if targets is not None:
             x = safe_move(x, "cuda:0")
