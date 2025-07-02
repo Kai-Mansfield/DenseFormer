@@ -71,25 +71,26 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
             if torch.any(y.cpu() >= model.config.vocab_size):
                 print(f"Warning: targets contain indices >= vocab_size ({model.config.vocab_size})")
             with type_ctx:
-                if getattr(model, "needs_iter", False):
-                    outputs = model(x, targets=y, iter=itr)
-                else:
-                    # x = x.to('cuda:1')
-                    # y = y.to('cuda:1')
-                    # model = model.to('cuda:1')
-                    # print('x device:', x.device)
-                    # print('y device:', y.device)
-                    # print('model params device:', next(model.parameters()).device)
-                    if torch.isnan(x).any():
-                        print("Input x contains NaNs!")
-                    # else:
-                    #     print("Input x has no NaNs.")
+                with distributed_backend.get_context_for_microstep_forward(model=model, microstep_idx=microstep_idx, gradient_accumulation_steps=acc_steps):
+                    if getattr(model, "needs_iter", False):
+                        outputs = model(x, targets=y, iter=itr)
+                    else:
+                        # x = x.to('cuda:1')
+                        # y = y.to('cuda:1')
+                        # model = model.to('cuda:1')
+                        # print('x device:', x.device)
+                        # print('y device:', y.device)
+                        # print('model params device:', next(model.parameters()).device)
+                        if torch.isnan(x).any():
+                            print("Input x contains NaNs!")
+                        # else:
+                        #     print("Input x has no NaNs.")
 
-                    if torch.isnan(y).any():
-                        print("Target y contains NaNs!")
-                    # else:
-                    #     print("Target y has no NaNs.")
-                    outputs = model(x, targets=y)
+                        if torch.isnan(y).any():
+                            print("Target y contains NaNs!")
+                        # else:
+                        #     print("Target y has no NaNs.")
+                        outputs = model(x, targets=y)
 
             loss = outputs['loss']
             for name, param in model.named_parameters():

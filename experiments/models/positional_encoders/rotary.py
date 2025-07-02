@@ -18,6 +18,18 @@ from torch import nn
 from .encoder import PositionalEncoder, PositionalEncoderClosure
 from .rotary_utils import apply_rotary_emb
 
+def safe_move(x, device):
+    if isinstance(x, torch.Tensor):
+        if x.requires_grad and x.device != device:
+            return x.detach().cpu().to(device).requires_grad_(x.requires_grad)
+        else:
+            return x.to(device)
+    # If x is a module (nn.Module), just call .to(device)
+    elif isinstance(x, torch.nn.Module) or hasattr(x, 'to'):
+        return x.to(device)
+    else:
+        # fallback, e.g. for other types, just return as is or raise error
+        raise TypeError(f"safe_move expects nn.Module or Tensor, got {type(x)}")
 
 class RotaryPositionalEncoderClosure(PositionalEncoderClosure):
 
@@ -26,7 +38,7 @@ class RotaryPositionalEncoderClosure(PositionalEncoderClosure):
         if T == 0:
             return v
         other_dims_prefix = other_dims[:len(other_dims) - len(indices.shape) + 1]
-        freqs = (indices.unsqueeze(-1) * self.encoder.freqs.to(indices.device).view(1, -1)).unsqueeze(-1).expand(*indices.shape, -1, 2).reshape(*indices.shape, hs)
+        freqs = (indices.unsqueeze(-1) * safe_move(self.encoder.freqs, indices.device).view(1, -1)).unsqueeze(-1).expand(*indices.shape, -1, 2).reshape(*indices.shape, hs)
         freqs = freqs.view([1] * len(other_dims_prefix) + list(indices.shape) + [hs]).expand(*v.shape)
         v = apply_rotary_emb(freqs, v)
         return v
