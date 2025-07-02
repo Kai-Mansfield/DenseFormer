@@ -325,6 +325,8 @@ class GPTBase(nn.Module):
             x = self.lm_cache.get_final_logits(x)
         if torch.isnan(x).any():
             print(f"NaNs found after self.lm_cache.get_final_logits(x)")
+        print("x min:", x.min().item())
+        print("x max:", x.max().item())
 
         if targets is not None:
             x = safe_move(x, "cuda:0")
@@ -337,13 +339,13 @@ class GPTBase(nn.Module):
             # print('tragets size:', targets.size())
             # print('logits device:', logits.device)
             # print('targets device:', targets.device)
-            topk_vals, topk_indices = logits.topk(k=5, dim=-1)  # top 5 predicted classes per position
-            print("Top 5 predicted class indices for first batch element, first token position:", topk_indices[0,0])
-            print("Top 5 predicted scores for first batch element, first token position:", topk_vals[0,0])
-            print("isnan:", torch.isnan(logits).any().item())
-            print("isinf:", torch.isinf(logits).any().item())
-            print("logits min:", logits.min().item())
-            print("logits max:", logits.max().item())
+            # topk_vals, topk_indices = logits.topk(k=5, dim=-1)  # top 5 predicted classes per position
+            # print("Top 5 predicted class indices for first batch element, first token position:", topk_indices[0,0])
+            # print("Top 5 predicted scores for first batch element, first token position:", topk_vals[0,0])
+            # print("isnan:", torch.isnan(logits).any().item())
+            # print("isinf:", torch.isinf(logits).any().item())
+            # print("logits min:", logits.min().item())
+            # print("logits max:", logits.max().item())
             loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
         else:
             logits = self.lm_head(x[:, [-1], :])
