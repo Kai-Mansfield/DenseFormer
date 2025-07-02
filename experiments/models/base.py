@@ -32,16 +32,23 @@ from torch.nn import functional as F
 from . import positional_encoders, caches
 
 def safe_move(x, device):
+    def move_tensor(t):
+        return t.detach().cpu().to(device).requires_grad_(t.requires_grad)
+
     if isinstance(x, torch.Tensor):
-        if x.requires_grad and x.device != device:
-            return x.detach().cpu().to(device).requires_grad_(x.requires_grad)
-        else:
-            return x.to(device)
-    # If x is a module (nn.Module), just call .to(device)
-    elif isinstance(x, torch.nn.Module) or hasattr(x, 'to'):
+        return move_tensor(x)
+
+    elif isinstance(x, torch.nn.Module):
+        for param in x.parameters(recurse=True):
+            new_param = move_tensor(param)
+            param.data = new_param.data
+            param.requires_grad = new_param.requires_grad
+        for buffer_name, buffer in x._buffers.items():
+            if buffer is not None:
+                x._buffers[buffer_name] = buffer.detach().cpu().to(device)
         return x.to(device)
+
     else:
-        # fallback, e.g. for other types, just return as is or raise error
         raise TypeError(f"safe_move expects nn.Module or Tensor, got {type(x)}")
 
 class LayerNorm(nn.Module):
