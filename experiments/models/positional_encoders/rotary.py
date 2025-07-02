@@ -33,7 +33,12 @@ def safe_move(x, device):
         for buffer_name, buffer in x._buffers.items():
             if buffer is not None:
                 x._buffers[buffer_name] = buffer.detach().cpu().to(device)
-        return x.to(device)
+        return x
+
+    elif hasattr(x, "__dict__") and hasattr(x, "encoder"):
+        # Move encoder inside closure
+        x.encoder = safe_move(x.encoder, device)
+        return x
 
     else:
         raise TypeError(f"safe_move expects nn.Module or Tensor, got {type(x)}")
