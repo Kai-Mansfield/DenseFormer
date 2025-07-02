@@ -61,7 +61,7 @@ def main(args):
     args = distributed_backend.get_adjusted_args_for_process(args)
 
     print('args.device', args.device)
-    if args.device is not 'cpu':
+    if args.device != 'cpu':
         args.device = torch.device(f"cuda:{local_rank}")
         torch.cuda.set_device(args.device)
     device_type = 'cuda' if 'cuda' in str(args.device) else 'cpu'
