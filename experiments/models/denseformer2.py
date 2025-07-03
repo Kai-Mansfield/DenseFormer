@@ -224,7 +224,11 @@ class DenseFormer2(nn.Module):
                 torch.nn.init.normal_(p, mean=0.0, std=0.02/math.sqrt(2 * config.n_layer))
         for module in self.weights:
             module.weight.data.zero_()
-            module.weight.data[0, -1] = 1.
+            w = module.weight.view(-1)
+            n = w.numel() // 2
+            assert w.numel() == 2 * n, f"Expected {2 * n} weights, got {w.numel()}"
+            module.weight.data[0, n] = 1.
+            module.weight.data[0, 2 * n] = 1.
 
         # report number of parameters
         print("number of parameters: %.2fM" % (self.get_num_params()/1e6,))
