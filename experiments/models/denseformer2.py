@@ -326,7 +326,7 @@ class DenseFormer2(nn.Module):
                 x_proj_i = torch.tensordot(w_i, x_i, dims=1)  # shape: (embedding_dim,) or broadcasted
                 print('x_proj_i', x_proj_i.shape)
                 x_proj.append(x_proj_i)
-            print('x_proj', x_proj.shape)
+            print('x_proj', len(x_proj))
             # Concatenate along the last dimension
             x = torch.cat(x_proj, dim=-1)
             print('x', x.shape)
