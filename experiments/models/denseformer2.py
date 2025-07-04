@@ -308,7 +308,7 @@ class DenseFormer2(nn.Module):
             split_sizes = get_split_sizes(C, self.es)
             print('split_sizes', split_sizes)
             x_splits = torch.split(x_stack, split_sizes, dim=-1)
-            print('x_splits', x_splits)
+            print('x_splits', x_splits.shape)
 
             w = self.weights[rep_idx - 1].weight.view(-1)
             print('w', w.shape)
