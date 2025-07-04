@@ -306,30 +306,21 @@ class DenseFormer2(nn.Module):
                 raise RuntimeError(f"Trying to split along empty embedding dim: {C}")
 
             split_sizes = get_split_sizes(C, self.es)
-            print('split_sizes', split_sizes)
             x_splits = torch.split(x_stack, split_sizes, dim=-1)
-            print('x_splits', len(x_splits))
 
             w = self.weights[rep_idx - 1].weight.view(-1)
-            print('w', w.shape)
             n = w.numel() // self.es
-            print('n', n)
             assert w.numel() == self.es * n, f"Expected {self.es * n} weights, got {w.numel()}"
 
             # Apply weights to each split
             x_proj = []
             for i in range(self.es):
                 w_i = w[i * n : (i + 1) * n]
-                print('w_i', w_i.shape)
                 x_i = x_splits[i]
-                print('x_i', x_i.shape)
-                x_proj_i = torch.tensordot(w_i, x_i, dims=1)  # shape: (embedding_dim,) or broadcasted
-                print('x_proj_i', x_proj_i.shape)
+                x_proj_i = torch.tensordot(w_i, x_i, dims=1)  
                 x_proj.append(x_proj_i)
-            print('x_proj', len(x_proj))
             # Concatenate along the last dimension
             x = torch.cat(x_proj, dim=-1)
-            print('x', x.shape)
             del x_proj, x_splits, split_sizes, x_stack, C, n, w
 
         x = self.transformer.ln_f(x)

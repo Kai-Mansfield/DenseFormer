@@ -105,7 +105,7 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
                                 opt=opt,
                                 scheduler=scheduler,
                                 itr=itr,
-                                ckpt_path=f"{ckpt_path}/ckpt.pt")
+                                ckpt_path=f"{ckpt_path}/ckpt_{extra_args.es}.pt")
 
     if distributed_backend.is_master_process():
         print(f"saving checkpoint to {ckpt_path}")
@@ -114,6 +114,6 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
                         opt=opt,
                         scheduler=scheduler,
                         itr=itr,
-                        ckpt_path=f"{ckpt_path}/ckpt.pt")
+                        ckpt_path=f"{ckpt_path}/ckpt_{extra_args.es}.pt")
 
     return stats
