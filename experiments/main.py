@@ -155,10 +155,6 @@ def main(args):
     if not os.path.exists(ckpt_path):
         if distributed_backend.is_master_process():
             os.makedirs(ckpt_path)
-    else:
-        if os.path.isfile(f"{ckpt_path}/summary.json"):
-            print(f"Already found experiment '{ckpt_path}'.\nSkipping.")
-            sys.exit(0)
 
     if 'base' in args.model or 'mc' in args.model or True:
         train = train_base
@@ -177,9 +173,6 @@ def main(args):
     args.device = None
     args.dtype = None
     stats['args'] = vars(args)
-    if distributed_backend.is_master_process():
-        with open(f"{ckpt_path}/summary.json", "w") as fs:
-            json.dump(stats, fs)
     distributed_backend.finalize()
 
 
