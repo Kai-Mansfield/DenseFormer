@@ -311,7 +311,7 @@ class DenseFormer2(nn.Module):
             print('x_splits', x_splits)
 
             w = self.weights[rep_idx - 1].weight.view(-1)
-            print('w', w)
+            print('w', w.shape)
             n = w.numel() // self.es
             print('n', n)
             assert w.numel() == self.es * n, f"Expected {self.es * n} weights, got {w.numel()}"
@@ -320,9 +320,9 @@ class DenseFormer2(nn.Module):
             x_proj = []
             for i in range(self.es):
                 w_i = w[i * n : (i + 1) * n]
-                print('w_i', w_i)
+                print('w_i', w_i.shape)
                 x_i = x_splits[i]
-                print('x_i', x_i)
+                print('x_i', x_i.shape)
                 x_proj_i = torch.tensordot(w_i, x_i, dims=1)  # shape: (embedding_dim,) or broadcasted
                 print('x_proj_i', x_proj_i.shape)
                 x_proj.append(x_proj_i)
