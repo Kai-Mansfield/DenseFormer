@@ -24,6 +24,11 @@ from torch.nn import functional as F
 
 from . import positional_encoders, caches
 
+def get_split_sizes(C, es):
+    base = C // es
+    remainder = C % es
+    return [base + 1 if i < remainder else base for i in range(es)]
+
 class InPlaceSetSlice(torch.autograd.Function):
 
     @staticmethod
@@ -193,6 +198,7 @@ class DenseFormer2(nn.Module):
         self.tokenizer = tiktoken.get_encoding("gpt2")
         self.n_repeat = config.n_layer // self.increase_T_every
         self.dilation_factor = config.dilation_factor
+        self.es = config.es
 
         self.lm_cache = caches.get_cache(config.lm_cache)(config)
 
@@ -205,7 +211,7 @@ class DenseFormer2(nn.Module):
         ))
 
         self.weights = nn.ModuleList([
-            nn.Linear(2 * (i + 2 + self.dilation_factor - 1) // self.dilation_factor, 1, bias=False) 
+            nn.Linear(self.es * (i + 2 + self.dilation_factor - 1) // self.dilation_factor, 1, bias=False) 
             for i in range(self.n_repeat)
         ])
 
@@ -225,10 +231,16 @@ class DenseFormer2(nn.Module):
         for module in self.weights:
             module.weight.data.zero_()
             w = module.weight.view(-1)
-            n = w.numel() // 2
-            assert w.numel() == 2 * n, f"Expected {2 * n} weights, got {w.numel()}"
-            module.weight.data[0, n - 1] = 1.
-            module.weight.data[0, 2 * n - 1] = 1.
+            total = w.numel()
+            print('total', total)
+            assert total % self.es == 0, f"Expected weight length divisible by n_splits={self.es}, got {total}"
+            n = total // self.es
+            print('n', n)
+
+            for i in range(self.es):
+                idx = (i + 1) * n - 1  # last index in each split
+                print('idx', idx)
+                module.weight.data[0, idx] = 1.
 
         # report number of parameters
         print("number of parameters: %.2fM" % (self.get_num_params()/1e6,))
@@ -291,17 +303,29 @@ class DenseFormer2(nn.Module):
             x_stack = x_accs[rep_idx % self.dilation_factor][1]  
             if x_stack is None:
                 raise RuntimeError(f"x_stack is None at rep_idx={rep_idx}")
+
             C = x_stack.shape[-1]
             if C == 0:
                 raise RuntimeError(f"Trying to split along empty embedding dim: {C}")
-            split_sizes = [(C + 1) // 2, C // 2]  # First half gets the extra dim if odd
-            x_left, x_right = torch.split(x_stack, split_sizes, dim=-1)
+
+            split_sizes = get_split_sizes(C, self.es)
+            x_splits = torch.split(x_stack, split_sizes, dim=-1)
+
             w = self.weights[rep_idx - 1].weight.view(-1)
-            n = w.numel() // 2
-            assert w.numel() == 2 * n, f"Expected {2 * n} weights, got {w.numel()}"
-            x_left = torch.tensordot(w[:n], x_left, dims=1)
-            x_right = torch.tensordot(w[n:], x_right, dims=1)
-            x = torch.cat([x_left, x_right], dim=-1) 
+            n = w.numel() // self.es
+            assert w.numel() == self.es * n, f"Expected {self.es * n} weights, got {w.numel()}"
+
+            # Apply weights to each split
+            x_proj = []
+            for i in range(self.es):
+                w_i = w[i * n : (i + 1) * n]
+                x_i = x_splits[i]
+                x_proj_i = torch.tensordot(w_i, x_i, dims=1)  # shape: (embedding_dim,) or broadcasted
+                x_proj.append(x_proj_i)
+
+            # Concatenate along the last dimension
+            x = torch.cat(x_proj, dim=-1)
+
             del x_left, x_right, split_sizes, x_stack, C, n, w
 
         x = self.transformer.ln_f(x)

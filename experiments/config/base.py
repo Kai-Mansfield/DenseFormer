@@ -70,6 +70,8 @@ def parse_args(base_parser, args, namespace):
     # DenseFormer
     parser.add_argument('--increase_T_every', default=2, type=int)
     parser.add_argument('--dilation_factor', default=1, type=int)
+    # DenseFormer 2
+    parser.add_argument('--es', default=2, type=int)
     # logging params (WandB)
     parser.add_argument('--wandb', action='store_true') # whether to use wandb or not
     parser.add_argument('--wandb_project', default="my-project", type=str)
