@@ -330,7 +330,7 @@ class DenseFormer2(nn.Module):
             # Concatenate along the last dimension
             x = torch.cat(x_proj, dim=-1)
             print('x', x.shape)
-            del x_left, x_right, split_sizes, x_stack, C, n, w
+            del x_proj, x_splits, split_sizes, x_stack, C, n, w
 
         x = self.transformer.ln_f(x)
 
