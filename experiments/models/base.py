@@ -318,7 +318,44 @@ class GPTBase(nn.Module):
             if torch.isnan(x).any():
                 print(f"NaNs found in output of block {i}")
 
+        # Assume self.transformer.wte is initially on cuda:0.
+        # Get the embedding weights before transfer
+        wte_before = x.weight.data.clone()
+        requires_grad_before = x.requires_grad
+        device_before = x.weight.device
+
+        # (Optional) If you have already computed some gradients or want to inspect them,
+        # you can check:
+        grad_before = x.weight.grad  # might be None if no backward yet
+
+        # Now, move the module to cuda:1
         x = safe_move(x, "cuda:1")
+
+        # Get the embedding weights after transfer
+        wte_after = x.weight.data.clone()
+        requires_grad_after = x.weight.requires_grad
+        device_after = x.weight.device
+
+        # Compare the weights. We compare using .to() to ensure both tensors are on the same device.
+        diff = torch.abs(wte_before.to(device_after) - wte_after).max().item()
+        print("Max difference between pre and post transfer weights:", diff)
+
+        # Check devices
+        print("Device before:", device_before)
+        print("Device after:", device_after)
+
+        # Check requires_grad attribute
+        print("Requires grad before:", requires_grad_before)
+        print("Requires grad after:", requires_grad_after)
+
+        # If gradients already exist, you can compare those as well.
+        if grad_before is not None:
+            # Make sure grad_before is moved to the correct device for comparison.
+            grad_diff = torch.abs(grad_before.to(device_after) - self.transformer.wte.weight.grad).max().item()
+            print("Max difference in gradients:", grad_diff)
+        else:
+            print("No gradients available before transfer (or they are None).")
+
         #print("x after move", x.min(), x.max(), x.dtype)
         if torch.isnan(x).any():
                 print(f"NaNs found after x.to(cuda:1)")
