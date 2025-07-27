@@ -320,21 +320,21 @@ class GPTBase(nn.Module):
 
         # Assume self.transformer.wte is initially on cuda:0.
         # Get the embedding weights before transfer
-        wte_before = x.weight.data.clone()
+        wte_before = x.data.clone()
         requires_grad_before = x.requires_grad
-        device_before = x.weight.device
+        device_before = x.device
 
         # (Optional) If you have already computed some gradients or want to inspect them,
         # you can check:
-        grad_before = x.weight.grad  # might be None if no backward yet
+        grad_before = x.grad  # might be None if no backward yet
 
         # Now, move the module to cuda:1
         x = safe_move(x, "cuda:1")
 
         # Get the embedding weights after transfer
-        wte_after = x.weight.data.clone()
-        requires_grad_after = x.weight.requires_grad
-        device_after = x.weight.device
+        wte_after = x.data.clone()
+        requires_grad_after = x.requires_grad
+        device_after = x.device
 
         # Compare the weights. We compare using .to() to ensure both tensors are on the same device.
         diff = torch.abs(wte_before.to(device_after) - wte_after).max().item()
@@ -351,7 +351,7 @@ class GPTBase(nn.Module):
         # If gradients already exist, you can compare those as well.
         if grad_before is not None:
             # Make sure grad_before is moved to the correct device for comparison.
-            grad_diff = torch.abs(grad_before.to(device_after) - self.transformer.wte.weight.grad).max().item()
+            grad_diff = torch.abs(grad_before.to(device_after) - x.grad).max().item()
             print("Max difference in gradients:", grad_diff)
         else:
             print("No gradients available before transfer (or they are None).")
