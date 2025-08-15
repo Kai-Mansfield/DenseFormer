@@ -245,10 +245,10 @@ class GPTBase(nn.Module):
         for block in self.transformer.h:
             x = block(x, pos_emb_closure, cache_context, start_index=index_shift)
         x = self.transformer.ln_f(x)
-        print(x.grad )
 
         if use_cache:
             x = self.lm_cache.get_final_logits(x)
+            print(x.grad )
         if targets is not None:
             # if we are given some desired targets also calculate the loss
             logits = self.lm_head(x)
@@ -258,6 +258,8 @@ class GPTBase(nn.Module):
             logits = self.lm_head(x[:, [-1], :]) # note: using list [-1] to preserve the time dim
             loss = None
         logits = logits if get_logits else None
+        print(logits.grad )
+        print(loss.grad )
         return {'logits': logits, 'loss': loss}
 
     def clear_state(self):
