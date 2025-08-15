@@ -241,11 +241,11 @@ class GPTBase(nn.Module):
             idx, pos_emb_closure = self.transformer.wpe(idx) # position embeddings of shape (1, t, n_embd)
         tok_emb = self.transformer.wte(idx) # token embeddings of shape (b, t, n_embd)
         x = pos_emb_closure.adapt_model_input(tok_emb, start_index=index_shift)
-        print(x.grad )
         x = self.transformer.drop(x)
         for block in self.transformer.h:
             x = block(x, pos_emb_closure, cache_context, start_index=index_shift)
         x = self.transformer.ln_f(x)
+        print(x.grad )
 
         if use_cache:
             x = self.lm_cache.get_final_logits(x)
