@@ -258,7 +258,8 @@ class GPTBase(nn.Module):
             logits = self.lm_head(x[:, [-1], :]) # note: using list [-1] to preserve the time dim
             loss = None
         logits = logits if get_logits else None
-        print(logits.grad )
+        if get_logits:
+            print(logits.grad )
         print(loss.grad )
         return {'logits': logits, 'loss': loss}
 
