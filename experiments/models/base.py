@@ -320,7 +320,7 @@ class GPTBase(nn.Module):
 
         # Assume self.transformer.wte is initially on cuda:0.
         # Get the embedding weights before transfer
-        wte_before = x.data.clone()
+        wte_before = x.data.cpu().clone()
         requires_grad_before = x.requires_grad
         device_before = x.device
 
@@ -332,12 +332,12 @@ class GPTBase(nn.Module):
         x = safe_move(x, "cuda:1")
 
         # Get the embedding weights after transfer
-        wte_after = x.data.clone()
+        wte_after = x.data.cpu().clone()
         requires_grad_after = x.requires_grad
         device_after = x.device
 
         # Compare the weights. We compare using .to() to ensure both tensors are on the same device.
-        diff = torch.abs(wte_before.to(device_after) - wte_after).max().item()
+        diff = torch.abs(wte_before - wte_after).max().item()
         print("Max difference between pre and post transfer weights:", diff)
 
         # Check devices
