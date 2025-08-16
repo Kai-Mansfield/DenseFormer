@@ -246,7 +246,6 @@ class GPTBase(nn.Module):
         self.transformer["wpe"]  = safe_move(self.transformer["wpe"], "cuda:0")
         self.transformer["drop"] = safe_move(self.transformer["drop"], "cuda:0")
 
-        mid = num_layers // 2
         for i, block in enumerate(self.transformer["h"]):
             if i < mid:
                 self.transformer["h"][i] = safe_move(block, "cuda:0")
