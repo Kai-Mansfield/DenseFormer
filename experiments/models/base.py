@@ -229,20 +229,31 @@ class GPTBase(nn.Module):
 
         # === Split model components across cuda:0 and cuda:1 ===
         self.transformer = nn.ModuleDict(dict(
-            # Device 0: embeddings and first half of layers
-            wte = safe_move(nn.Embedding(config.vocab_size, config.n_embd), "cuda:0"),
-            wpe = safe_move(positional_encoders.get_encoder(config.positional_encoder)(config), "cuda:0"),
-            drop = safe_move(nn.Dropout(config.dropout), "cuda:0"),
+            # Start everything on CPU
+            wte = nn.Embedding(config.vocab_size, config.n_embd),
+            wpe = positional_encoders.get_encoder(config.positional_encoder)(config),
+            drop = nn.Dropout(config.dropout),
 
-            # Transformer blocks split across two devices
             h = nn.ModuleList([
-                safe_move(Block(config, self.lm_cache), "cuda:0") if i < mid else safe_move(Block(config, self.lm_cache), "cuda:1")
-                for i in range(num_layers)
+                Block(config, self.lm_cache) for _ in range(num_layers)
             ]),
 
-            # Device 1: final layer norm
-            ln_f = safe_move(LayerNorm(config.n_embd, bias=config.bias), "cuda:1"),
+            ln_f = LayerNorm(config.n_embd, bias=config.bias),
         ))
+
+        # Now move to GPUs selectively
+        self.transformer["wte"]  = safe_move(self.transformer["wte"], "cuda:0")
+        self.transformer["wpe"]  = safe_move(self.transformer["wpe"], "cuda:0")
+        self.transformer["drop"] = safe_move(self.transformer["drop"], "cuda:0")
+
+        mid = num_layers // 2
+        for i, block in enumerate(self.transformer["h"]):
+            if i < mid:
+                self.transformer["h"][i] = safe_move(block, "cuda:0")
+            else:
+                self.transformer["h"][i] = safe_move(block, "cuda:1")
+
+        self.transformer["ln_f"] = safe_move(self.transformer["ln_f"], "cuda:1")
 
         # Device 1: language modeling head
         self.lm_head = safe_move(nn.Linear(config.n_embd, config.vocab_size, bias=False), "cuda:0")
