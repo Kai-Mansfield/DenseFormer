@@ -242,11 +242,11 @@ class GPTBase(nn.Module):
         ))
 
         # Now move to GPUs selectively
-        wte_before = self.transformer["wte"].weight.data.cpu().clone()
+        wte_before = self.transformer["wte"].data.cpu().clone()
         self.transformer["wte"]  = safe_move(self.transformer["wte"], "cuda:0")
-        wpe_before = self.transformer["wpe"].weight.data.cpu().clone()
+        wpe_before = self.transformer["wpe"].data.cpu().clone()
         self.transformer["wpe"]  = safe_move(self.transformer["wpe"], "cuda:0")
-        drop_before = self.transformer["drop"].weight.data.cpu().clone()
+        drop_before = self.transformer["drop"].data.cpu().clone()
         self.transformer["drop"] = safe_move(self.transformer["drop"], "cuda:0")
 
         blocks_before = []
