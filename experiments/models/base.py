@@ -254,11 +254,18 @@ class GPTBase(nn.Module):
         self.transformer["drop"] = safe_move(self.transformer["drop"], "cuda:0")
 
         blocks_before = []
-        for block in self.transformer["h"]:
+        for i, block in enumerate(self.transformer["h"]):
             params_copy = {name: p.data.cpu().clone() for name, p in block.named_parameters()}
             blocks_before.append(params_copy)
-        print('parms copy', params_copy)
-        print('blocks before', blocks_before)
+            
+            # Print a summary for this block
+            print(f"Block {i}:")
+            for name, tensor in params_copy.items():
+                print(f"  {name}: shape={tensor.shape}, "
+                    f"mean={tensor.mean().item():.4f}, "
+                    f"std={tensor.std().item():.4f}, "
+                    f"min={tensor.min().item():.4f}, "
+                    f"max={tensor.max().item():.4f}")
 
         for i, block in enumerate(self.transformer["h"]):
             if i < mid:
