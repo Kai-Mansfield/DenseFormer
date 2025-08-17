@@ -248,7 +248,7 @@ class GPTBase(nn.Module):
         for name, param in self.transformer["wte"].named_parameters():
             wte_before.append(param.data.cpu().clone())
         self.transformer["wpe"]  = safe_move(self.transformer["wpe"], "cuda:0")
-        drop_before = self.transformer["drop"].data.cpu().clone()
+        drop_before = self.transformer["drop"].weight.data.cpu().clone()
         self.transformer["drop"] = safe_move(self.transformer["drop"], "cuda:0")
 
         blocks_before = []
