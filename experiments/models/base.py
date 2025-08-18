@@ -243,40 +243,57 @@ class GPTBase(nn.Module):
 
         # Now move to GPUs selectively
         wte_before = self.transformer["wte"].weight.data.cpu().clone()
+        print('wte_before.requires_grad', wte_before.requires_grad)
+        print('wte_before.device', wte_before.device)
         self.transformer["wte"]  = safe_move(self.transformer["wte"], "cuda:0")
+        wte_after = self.transformer["wte"].weight.data.cpu().clone()
+        print('wte_after.requires_grad', wte_after.requires_grad)
+        print('wte_after.device', wte_after.device)
+        diff = torch.abs(wte_before - wte_after).max().item()
+        print("Max difference between wte pre and post transfer weights:", diff)
+
         wpe_before = []
         for name, param in self.transformer["wpe"].named_parameters():
             wpe_before.append(param.data.cpu().clone())
+        print('wpe_before.requires_grad', wpe_before.requires_grad)
+        print('wpe_before.device', wpe_before.device)
         self.transformer["wpe"]  = safe_move(self.transformer["wpe"], "cuda:0")
+        wpe_after = []
+        for name, param in self.transformer["wpe"].named_parameters():
+            wpe_after.append(param.data.cpu().clone())
+        print('wpe_after.requires_grad', wpe_after.requires_grad)
+        print('wpe_after.device', wpe_after.device)
+        diff = torch.abs(wpe_before - wpe_after).max().item()
+        print("Max difference between wpe pre and post transfer weights:", diff)
+
         drop_before = []
         for name, param in self.transformer["drop"].named_parameters():
             drop_before.append(param.data.cpu().clone())
         self.transformer["drop"] = safe_move(self.transformer["drop"], "cuda:0")
+        drop_after = []
+        for name, param in self.transformer["drop"].named_parameters():
+            drop_after.append(param.data.cpu().clone())
 
         blocks_before = []
+        blocks_after = []
         for i, block in enumerate(self.transformer["h"]):
             params_copy = {name: p.data.cpu().clone() for name, p in block.named_parameters()}
             blocks_before.append(params_copy)
-            
-            # Print a summary for this block
-            print(f"Block {i}:")
-            for name, tensor in params_copy.items():
-                print(f"  {name}: shape={tensor.shape}, "
-                    f"mean={tensor.mean().item():.4f}, "
-                    f"std={tensor.std().item():.4f}, "
-                    f"min={tensor.min().item():.4f}, "
-                    f"max={tensor.max().item():.4f}")
 
-        for i, block in enumerate(self.transformer["h"]):
             if i < mid:
                 self.transformer["h"][i] = safe_move(block, "cuda:0")
             else:
                 self.transformer["h"][i] = safe_move(block, "cuda:1")
+            params_copy = {name: p.data.cpu().clone() for name, p in block.named_parameters()}
+            blocks_after.append(params_copy)
 
+        ln_f_before = self.transformer["ln_f"].weight.data.cpu().clone()
         self.transformer["ln_f"] = safe_move(self.transformer["ln_f"], "cuda:1")
+        ln_f_after = self.transformer["ln_f"].weight.data.cpu().clone()
 
-        # Device 1: language modeling head
+        lm_head_before = self.transformer["wte"].weight.data.cpu().clone()
         self.lm_head = safe_move(nn.Linear(config.n_embd, config.vocab_size, bias=False), "cuda:0")
+        lm_head_after = self.lm_head.weight.data.cpu().clone()
 
         # self.transformer.wte = self.transformer.wte.to("cuda:1")
         # self.lm_head = self.lm_head.to("cuda:1")
