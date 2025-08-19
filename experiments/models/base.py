@@ -252,6 +252,11 @@ class GPTBase(nn.Module):
         diff = torch.abs(wte_before - wte_after).max().item()
         print("Max difference between wte pre and post transfer weights:", diff)
 
+        print("wpe type:", type(self.transformer["wpe"]))
+        print("wpe children:", list(self.transformer["wpe"].children()))
+        print("wpe named parameters:", list(self.transformer["wpe"].named_parameters()))
+        print("wpe named buffers:", list(self.transformer["wpe"].named_buffers()))
+
         wpe_before = []
         for name, param in self.transformer["wpe"].named_parameters():
             wpe_before.append(param.data.cpu().clone())
