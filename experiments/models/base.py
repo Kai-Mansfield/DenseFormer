@@ -252,32 +252,59 @@ class GPTBase(nn.Module):
         diff = torch.abs(wte_before - wte_after).max().item()
         print("Max difference between wte pre and post transfer weights:", diff)
 
-        print("wpe type:", type(self.transformer["wpe"]))
-        print("wpe children:", list(self.transformer["wpe"].children()))
-        print("wpe named parameters:", list(self.transformer["wpe"].named_parameters()))
-        print("wpe named buffers:", list(self.transformer["wpe"].named_buffers()))
+        # wpe_before = []
+        # for name, param in self.transformer["wpe"].named_parameters():
+        #     wpe_before.append(param.data.cpu().clone())
+        #     print(f'wpe_before_{name}.requires_grad', param.requires_grad)
+        #     print(f'wpe_before_{name}.device', param.device)
+        # self.transformer["wpe"]  = safe_move(self.transformer["wpe"], "cuda:0")
+        # wpe_after = []
+        # for name, param in self.transformer["wpe"].named_parameters():
+        #     wpe_after.append(param.data.cpu().clone())
+        #     print(f'wpe_after_{name}.requires_grad', param.requires_grad)
+        #     print(f'wpe_after_{name}.device', param.device)
+        # for name, (before, after) in zip(self.transformer["wpe"].named_parameters(), zip(wpe_before, wpe_after)):
+        #     print(f"Checking {name} weights:")
+        #     print("Before transfer min/max:", before.min().item(), before.max().item())
+        #     print("After transfer min/max:", after.min().item(), after.max().item())
+        #     if before.shape != after.shape:
+        #         print(f"Shape mismatch for {name}: {before.shape} vs {after.shape}")
+        #     else:
+        #         print(f"Shape match for {name}: {before.shape}")
+        #     diff = torch.abs(before - after).max().item()
+        #     print("Max difference between wpe pre and post transfer weights:", diff)
 
-        wpe_before = []
-        for name, param in self.transformer["wpe"].named_parameters():
-            wpe_before.append(param.data.cpu().clone())
-            print(f'wpe_before_{name}.requires_grad', param.requires_grad)
-            print(f'wpe_before_{name}.device', param.device)
-        self.transformer["wpe"]  = safe_move(self.transformer["wpe"], "cuda:0")
-        wpe_after = []
-        for name, param in self.transformer["wpe"].named_parameters():
-            wpe_after.append(param.data.cpu().clone())
-            print(f'wpe_after_{name}.requires_grad', param.requires_grad)
-            print(f'wpe_after_{name}.device', param.device)
-        for name, (before, after) in zip(self.transformer["wpe"].named_parameters(), zip(wpe_before, wpe_after)):
-            print(f"Checking {name} weights:")
+        # Collect all buffers before transfer (on CPU)
+        wpe_before = {}
+        for name, buf in self.transformer["wpe"].named_buffers():
+            wpe_before[name] = buf.cpu().clone()
+            print(f'wpe_before_{name}.requires_grad', getattr(buf, "requires_grad", False))
+            print(f'wpe_before_{name}.device', buf.device)
+
+        # Move module to GPU
+        self.transformer["wpe"] = safe_move(self.transformer["wpe"], "cuda:0")
+
+        # Collect all buffers after transfer (on CPU for comparison)
+        wpe_after = {}
+        for name, buf in self.transformer["wpe"].named_buffers():
+            wpe_after[name] = buf.cpu().clone()
+            print(f'wpe_after_{name}.requires_grad', getattr(buf, "requires_grad", False))
+            print(f'wpe_after_{name}.device', buf.device)
+
+        # Compare before vs after
+        for name in wpe_before.keys():
+            before = wpe_before[name]
+            after = wpe_after[name]
+
+            print(f"\nChecking buffer {name}:")
             print("Before transfer min/max:", before.min().item(), before.max().item())
             print("After transfer min/max:", after.min().item(), after.max().item())
             if before.shape != after.shape:
-                print(f"Shape mismatch for {name}: {before.shape} vs {after.shape}")
+                print(f"Shape mismatch: {before.shape} vs {after.shape}")
             else:
-                print(f"Shape match for {name}: {before.shape}")
+                print(f"Shape match: {before.shape}")
             diff = torch.abs(before - after).max().item()
-            print("Max difference between wpe pre and post transfer weights:", diff)
+            print("Max difference pre/post transfer:", diff)
 
         drop_before = []
         for name, param in self.transformer["drop"].named_parameters():
