@@ -278,7 +278,7 @@ class GPTBase(nn.Module):
         wpe_before = {}
         for name, buf in self.transformer["wpe"].named_buffers():
             wpe_before[name] = buf.cpu().clone()
-            print(f'wpe_before_{name}.requires_grad', getattr(buf, "requires_grad", False))
+            print(f'\n wpe_before_{name}.requires_grad', getattr(buf, "requires_grad", False))
             print(f'wpe_before_{name}.device', buf.device)
 
         # Move module to GPU
@@ -296,15 +296,17 @@ class GPTBase(nn.Module):
             before = wpe_before[name]
             after = wpe_after[name]
 
-            print(f"\nChecking buffer {name}:")
-            print("Before transfer min/max:", before.min().item(), before.max().item())
-            print("After transfer min/max:", after.min().item(), after.max().item())
             if before.shape != after.shape:
-                print(f"Shape mismatch: {before.shape} vs {after.shape}")
+                print(f"\n Shape mismatch: {before.shape} vs {after.shape}")
             else:
-                print(f"Shape match: {before.shape}")
+                print(f"\n Shape match: {before.shape}")
             diff = torch.abs(before - after).max().item()
             print("Max difference pre/post transfer:", diff)
+
+        print("wpe type:", type(self.transformer["drop"]))
+        print("wpe children:", list(self.transformer["drop"].children()))
+        print("wpe named parameters:", list(self.transformer["drop"].named_parameters()))
+        print("wpe named buffers:", list(self.transformer["drop"].named_buffers()))
 
         drop_before = []
         for name, param in self.transformer["drop"].named_parameters():
