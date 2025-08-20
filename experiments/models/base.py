@@ -335,18 +335,18 @@ class GPTBase(nn.Module):
                     block_diffs[name] = f"Shape mismatch {before.shape} vs {after.shape}"
                 else:
                     diff = torch.abs(before - after).max().item()
-                    block_diffs[name] = diff
+                    if diff == 0.0:
+                        block_diffs[name] = "no diff"
+                    else:
+                        block_diffs[name] = f"max abs diff {diff:.6e}"
 
             blocks_diffs.append(block_diffs)
 
-        # Print summary (truncated so it doesn’t spam terminal)
+        # Print results
         for i, diffs in enumerate(blocks_diffs):
             print(f"\nBlock {i}:")
-            for name, diff in diffs.items():
-                if isinstance(diff, str):
-                    print(f"  {name}: {diff}")
-                else:
-                    print(f"  {name}: max abs diff {diff:.6e}")
+            for name, result in diffs.items():
+                print(f"  {name}: {result}")
 
         ln_f_before = self.transformer["ln_f"].weight.data.cpu().clone()
         self.transformer["ln_f"] = safe_move(self.transformer["ln_f"], "cuda:1")
