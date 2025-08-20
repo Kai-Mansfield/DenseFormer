@@ -243,7 +243,7 @@ class GPTBase(nn.Module):
 
         # Now move to GPUs selectively
         wte_before = self.transformer["wte"].weight.data.cpu().clone()
-        print('wte_before.requires_grad', wte_before.requires_grad)
+        print('\n wte_before.requires_grad', wte_before.requires_grad)
         print('wte_before.device', wte_before.device)
         self.transformer["wte"]  = safe_move(self.transformer["wte"], "cuda:0")
         wte_after = self.transformer["wte"].weight.data.cpu().clone()
@@ -306,28 +306,47 @@ class GPTBase(nn.Module):
         print("wpe type:", type(self.transformer["drop"]))
         print("wpe children:", list(self.transformer["drop"].children()))
         print("wpe named parameters:", list(self.transformer["drop"].named_parameters()))
-        print("wpe named buffers:", list(self.transformer["drop"].named_buffers()))
+        print("wpe named buffers:", list(self.transformer["drop"].named_buffers()), '\n')
 
-        drop_before = []
-        for name, param in self.transformer["drop"].named_parameters():
-            drop_before.append(param.data.cpu().clone())
         self.transformer["drop"] = safe_move(self.transformer["drop"], "cuda:0")
-        drop_after = []
-        for name, param in self.transformer["drop"].named_parameters():
-            drop_after.append(param.data.cpu().clone())
 
-        blocks_before = []
-        blocks_after = []
+        blocks_diffs = []
+
         for i, block in enumerate(self.transformer["h"]):
-            params_copy = {name: p.data.cpu().clone() for name, p in block.named_parameters()}
-            blocks_before.append(params_copy)
+            # Save params before
+            params_before = {name: p.detach().cpu().clone() for name, p in block.named_parameters()}
 
+            # Move to correct device
             if i < mid:
                 self.transformer["h"][i] = safe_move(block, "cuda:0")
             else:
                 self.transformer["h"][i] = safe_move(block, "cuda:1")
-            params_copy = {name: p.data.cpu().clone() for name, p in block.named_parameters()}
-            blocks_after.append(params_copy)
+
+            # Save params after
+            params_after = {name: p.detach().cpu().clone() for name, p in self.transformer["h"][i].named_parameters()}
+
+            # Compare before vs after for each param in this block
+            block_diffs = {}
+            for name in params_before:
+                before = params_before[name]
+                after = params_after[name]
+
+                if before.shape != after.shape:
+                    block_diffs[name] = f"Shape mismatch {before.shape} vs {after.shape}"
+                else:
+                    diff = torch.abs(before - after).max().item()
+                    block_diffs[name] = diff
+
+            blocks_diffs.append(block_diffs)
+
+        # Print summary (truncated so it doesn’t spam terminal)
+        for i, diffs in enumerate(blocks_diffs):
+            print(f"\nBlock {i}:")
+            for name, diff in diffs.items():
+                if isinstance(diff, str):
+                    print(f"  {name}: {diff}")
+                else:
+                    print(f"  {name}: max abs diff {diff:.6e}")
 
         ln_f_before = self.transformer["ln_f"].weight.data.cpu().clone()
         self.transformer["ln_f"] = safe_move(self.transformer["ln_f"], "cuda:1")
