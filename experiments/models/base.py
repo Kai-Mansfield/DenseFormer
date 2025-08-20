@@ -310,43 +310,90 @@ class GPTBase(nn.Module):
 
         self.transformer["drop"] = safe_move(self.transformer["drop"], "cuda:0")
 
-        blocks_diffs = []
+        def compare_blocks(blocks_before, blocks_after):
+            """
+            Compare two lists of blocks (before vs after transfer).
+            Checks parameters, buffers, dtype, requires_grad, training mode, and values.
+            """
+
+            for i, (before_block, after_block) in enumerate(zip(blocks_before, blocks_after)):
+                print(f"\n=== Checking Block {i} ===")
+
+                # ---- Module-level state ----
+                if before_block.training != after_block.training:
+                    print(f"  Training mode mismatch: {before_block.training} vs {after_block.training}")
+                else:
+                    print(f"  Training mode: {before_block.training} (OK)")
+
+                # ---- Parameters ----
+                for (name_before, p_before), (name_after, p_after) in zip(
+                    before_block.named_parameters(), after_block.named_parameters()
+                ):
+                    assert name_before == name_after, "Parameter name mismatch!"
+                    print(f"  Param: {name_before}")
+
+                    # Shape check
+                    if p_before.shape != p_after.shape:
+                        print(f"    Shape mismatch: {p_before.shape} vs {p_after.shape}")
+                        continue
+
+                    # Dtype check
+                    if p_before.dtype != p_after.dtype:
+                        print(f"    Dtype mismatch: {p_before.dtype} vs {p_after.dtype}")
+
+                    # requires_grad check
+                    if p_before.requires_grad != p_after.requires_grad:
+                        print(f"    requires_grad mismatch: {p_before.requires_grad} vs {p_after.requires_grad}")
+
+                    # Value check
+                    diff = torch.abs(p_before.detach().cpu() - p_after.detach().cpu()).max().item()
+                    if diff == 0.0:
+                        print(f"    No diff (OK)")
+                    else:
+                        print(f"    Max abs diff: {diff:.6e}")
+
+                # ---- Buffers ----
+                for (name_before, b_before), (name_after, b_after) in zip(
+                    before_block.named_buffers(), after_block.named_buffers()
+                ):
+                    assert name_before == name_after, "Buffer name mismatch!"
+                    print(f"  Buffer: {name_before}")
+
+                    # Shape check
+                    if b_before.shape != b_after.shape:
+                        print(f"    Shape mismatch: {b_before.shape} vs {b_after.shape}")
+                        continue
+
+                    # Dtype check
+                    if b_before.dtype != b_after.dtype:
+                        print(f"    Dtype mismatch: {b_before.dtype} vs {b_after.dtype}")
+
+                    # Value check
+                    diff = torch.abs(b_before.detach().cpu() - b_after.detach().cpu()).max().item()
+                    if diff == 0.0:
+                        print(f"    No diff (OK)")
+                    else:
+                        print(f"    Max abs diff: {diff:.6e}")
+
+
+        # Example usage inside your code
+        blocks_before = []
+        blocks_after = []
 
         for i, block in enumerate(self.transformer["h"]):
-            # Save params before
-            params_before = {name: p.detach().cpu().clone() for name, p in block.named_parameters()}
+            # Clone block before transfer
+            block_copy = safe_move(block, "cpu")  # ensure on CPU for comparison
+            blocks_before.append(block_copy)
 
-            # Move to correct device
+            # Move to GPU
             if i < mid:
-                self.transformer["h"][i] = safe_move(block, "cuda:0")
+                moved_block = safe_move(block, "cuda:0")
             else:
-                self.transformer["h"][i] = safe_move(block, "cuda:1")
+                moved_block = safe_move(block, "cuda:1")
+            blocks_after.append(moved_block)
 
-            # Save params after
-            params_after = {name: p.detach().cpu().clone() for name, p in self.transformer["h"][i].named_parameters()}
-
-            # Compare before vs after for each param in this block
-            block_diffs = {}
-            for name in params_before:
-                before = params_before[name]
-                after = params_after[name]
-
-                if before.shape != after.shape:
-                    block_diffs[name] = f"Shape mismatch {before.shape} vs {after.shape}"
-                else:
-                    diff = torch.abs(before - after).max().item()
-                    if diff == 0.0:
-                        block_diffs[name] = "no diff"
-                    else:
-                        block_diffs[name] = f"max abs diff {diff:.6e}"
-
-            blocks_diffs.append(block_diffs)
-
-        # Print results
-        for i, diffs in enumerate(blocks_diffs):
-            print(f"\nBlock {i}:")
-            for name, result in diffs.items():
-                print(f"  {name}: {result}")
+        # Run the comparison
+        compare_blocks(blocks_before, blocks_after)
 
         ln_f_before = self.transformer["ln_f"].weight.data.cpu().clone()
         self.transformer["ln_f"] = safe_move(self.transformer["ln_f"], "cuda:1")
