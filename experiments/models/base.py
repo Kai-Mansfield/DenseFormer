@@ -413,7 +413,7 @@ class GPTBase(nn.Module):
         print('lm_head_after.requires_grad', lm_head_after.requires_grad)
         print('lm_head_after.device', lm_head_after.device)
         diff = torch.abs(lm_head_before - lm_head_after).max().item()
-        print("Max difference between lm_head pre and post transfer weights:", diff)
+        print("Max difference between lm_head pre and post transfer weights:", diff, '\n')
 
         # self.transformer.wte = self.transformer.wte.to("cuda:1")
         # self.lm_head = self.lm_head.to("cuda:1")
