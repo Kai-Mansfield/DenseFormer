@@ -241,6 +241,12 @@ class GPTBase(nn.Module):
             ln_f = LayerNorm(config.n_embd, bias=config.bias),
         ))
 
+        self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
+
+        # self.transformer.wte = self.transformer.wte.to("cuda:1")
+        # self.lm_head = self.lm_head.to("cuda:1")
+        self.transformer.wte.weight = self.lm_head.weight
+
         # Now move to GPUs selectively
         wte_before = self.transformer["wte"].weight.data.cpu().clone()
         print('\n wte_before.requires_grad', wte_before.requires_grad)
@@ -405,19 +411,15 @@ class GPTBase(nn.Module):
         diff = torch.abs(ln_f_before - ln_f_after).max().item()
         print("Max difference between ln_f pre and post transfer weights:", diff)
 
-        lm_head_before = self.transformer["wte"].weight.data.cpu().clone()
+        lm_head_before = self.lm_head.weight.data.cpu().clone()
         print('\n lm_head_before.requires_grad', lm_head_before.requires_grad)
         print('lm_head_before.device', lm_head_before.device)
-        self.lm_head = safe_move(nn.Linear(config.n_embd, config.vocab_size, bias=False), "cuda:0")
+        self.lm_head = safe_move(self.lm_head, "cuda:0")
         lm_head_after = self.lm_head.weight.data.cpu().clone()
         print('lm_head_after.requires_grad', lm_head_after.requires_grad)
         print('lm_head_after.device', lm_head_after.device)
         diff = torch.abs(lm_head_before - lm_head_after).max().item()
         print("Max difference between lm_head pre and post transfer weights:", diff, '\n')
-
-        # self.transformer.wte = self.transformer.wte.to("cuda:1")
-        # self.lm_head = self.lm_head.to("cuda:1")
-        self.transformer.wte.weight = self.lm_head.weight
 
         # Initialize all weights
         self.apply(self._init_weights)
