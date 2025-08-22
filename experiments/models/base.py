@@ -39,11 +39,16 @@ def safe_move(x, device):
         return move_tensor(x)
 
     elif isinstance(x, torch.nn.Module):
-        for name, param in list(x.named_parameters(recurse=True)):
-            new_param = move_tensor(param)
-            # Re-wrap as nn.Parameter on the new device
-            setattr(x, name, torch.nn.Parameter(new_param, requires_grad=param.requires_grad))
+        for name, param in list(x.named_parameters(recurse=False)):
+            if param is not None:
+                new_param = move_tensor(param)
+                x.register_parameter(name, nn.Parameter(new_param, requires_grad=param.requires_grad))
 
+        # recurse into submodules
+        for child_name, child in x.named_children():
+            setattr(x, child_name, safe_move(child, device))
+
+        # move buffers
         for buffer_name, buffer in x._buffers.items():
             if buffer is not None:
                 x._buffers[buffer_name] = buffer.detach().to(device)
