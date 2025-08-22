@@ -257,8 +257,8 @@ class GPTBase(nn.Module):
 
         # Now move to GPUs selectively
         wte_before = self.transformer["wte"].weight.data.cpu().clone()
-        print('\n wte_before.requires_grad', wte_before.requires_grad)
-        print('wte_before.device', wte_before.device)
+        print('\n wte_before.requires_grad', self.transformer["wte"].weight.requires_grad)
+        print('wte_before.device', self.transformer["wte"].weight.device)
         self.transformer["wte"]  = safe_move(self.transformer["wte"], "cuda:0")
         #self.transformer.wte.weight = self.lm_head.weight
         wte_after = self.transformer["wte"].weight.data.cpu().clone()
