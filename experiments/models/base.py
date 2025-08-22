@@ -262,7 +262,7 @@ class GPTBase(nn.Module):
         self.transformer["wte"]  = safe_move(self.transformer["wte"], "cuda:0")
         #self.transformer.wte.weight = self.lm_head.weight
         wte_after = self.transformer["wte"].weight.data.cpu().clone()
-        print('wte_after.requires_grad', self.transformer["wte"].requires_grad)
+        print('wte_after.requires_grad', self.transformer["wte"].requires_grad_)
         print('wte_after.device', self.transformer["wte"].device)
         diff = torch.abs(wte_before - wte_after).max().item()
         print("Max difference between wte pre and post transfer weights:", diff)
