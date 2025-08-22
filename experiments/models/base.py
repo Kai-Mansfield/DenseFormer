@@ -252,6 +252,7 @@ class GPTBase(nn.Module):
         print('\n wte_before.requires_grad', wte_before.requires_grad)
         print('wte_before.device', wte_before.device)
         self.transformer["wte"]  = safe_move(self.transformer["wte"], "cuda:0")
+        self.transformer.wte.weight = self.lm_head.weight
         wte_after = self.transformer["wte"].weight.data.cpu().clone()
         print('wte_after.requires_grad', wte_after.requires_grad)
         print('wte_after.device', wte_after.device)
