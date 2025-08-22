@@ -33,19 +33,21 @@ from . import positional_encoders, caches
 
 def safe_move(x, device):
     def move_tensor(t):
-        return t.detach().cpu().to(device).requires_grad_(t.requires_grad)
+        return t.detach().to(device).requires_grad_(t.requires_grad)
 
     if isinstance(x, torch.Tensor):
         return move_tensor(x)
 
     elif isinstance(x, torch.nn.Module):
-        for param in x.parameters(recurse=True):
+        for name, param in list(x.named_parameters(recurse=True)):
             new_param = move_tensor(param)
-            param.data = new_param.data
-            param.requires_grad = new_param.requires_grad
+            # Re-wrap as nn.Parameter on the new device
+            setattr(x, name, torch.nn.Parameter(new_param, requires_grad=param.requires_grad))
+
         for buffer_name, buffer in x._buffers.items():
             if buffer is not None:
-                x._buffers[buffer_name] = buffer.detach().cpu().to(device)
+                x._buffers[buffer_name] = buffer.detach().to(device)
+
         return x
 
     elif hasattr(x, "__dict__") and hasattr(x, "encoder"):
