@@ -245,7 +245,7 @@ class GPTBase(nn.Module):
 
         # self.transformer.wte = self.transformer.wte.to("cuda:1")
         # self.lm_head = self.lm_head.to("cuda:1")
-        self.transformer.wte.weight = self.lm_head.weight
+        #self.transformer.wte.weight = self.lm_head.weight
 
         # Now move to GPUs selectively
         wte_before = self.transformer["wte"].weight.data.cpu().clone()
