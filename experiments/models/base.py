@@ -39,24 +39,25 @@ def safe_move(x, device):
         return move_tensor(x)
 
     elif isinstance(x, torch.nn.Module):
-        for name, param in list(x.named_parameters(recurse=False)):
+        # Move parameters directly in this module
+        for name, param in list(x._parameters.items()):
             if param is not None:
                 new_param = move_tensor(param)
-                x.register_parameter(name, nn.Parameter(new_param, requires_grad=param.requires_grad))
+                x._parameters[name] = nn.Parameter(new_param, requires_grad=param.requires_grad)
 
-        # recurse into submodules
-        for child_name, child in x.named_children():
-            setattr(x, child_name, safe_move(child, device))
-
-        # move buffers
+        # Move buffers
         for buffer_name, buffer in x._buffers.items():
             if buffer is not None:
                 x._buffers[buffer_name] = buffer.detach().to(device)
 
+        # Recurse into children
+        for child_name, child in x._modules.items():
+            if child is not None:
+                x._modules[child_name] = safe_move(child, device)
+
         return x
 
     elif hasattr(x, "__dict__") and hasattr(x, "encoder"):
-        # Move encoder inside closure
         x.encoder = safe_move(x.encoder, device)
         return x
 
