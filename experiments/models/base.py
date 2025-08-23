@@ -426,12 +426,12 @@ class GPTBase(nn.Module):
         print("Max difference between ln_f pre and post transfer weights:", diff)
 
         lm_head_before = self.lm_head.weight.data.cpu().clone()
-        print('\n lm_head_before.requires_grad', self.lm_head.requires_grad)
-        print('lm_head_before.device', self.lm_head.device)
+        print('\n lm_head_before.requires_grad', self.lm_head.weight.requires_grad)
+        print('lm_head_before.device', self.lm_head.weight.device)
         self.lm_head = safe_move(self.lm_head, "cuda:0")
         lm_head_after = self.lm_head.weight.data.cpu().clone()
-        print('lm_head_after.requires_grad', self.lm_head.requires_grad)
-        print('lm_head_after.device', self.lm_head.device)
+        print('lm_head_after.requires_grad', self.lm_head.weight.requires_grad)
+        print('lm_head_after.device', self.lm_head.weight.device)
         diff = torch.abs(lm_head_before - lm_head_after).max().item()
         print("Max difference between lm_head pre and post transfer weights:", diff, '\n')
 
