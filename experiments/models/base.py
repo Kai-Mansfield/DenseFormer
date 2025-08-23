@@ -325,6 +325,22 @@ class GPTBase(nn.Module):
 
         self.transformer["drop"] = safe_move(self.transformer["drop"], "cuda:0")
 
+        import copy
+
+        def snapshot_block(block):
+            """
+            Take a CPU snapshot of a block's parameters and buffers
+            without mutating the original block.
+            """
+            block_copy = copy.deepcopy(block)
+            for name, param in block_copy.named_parameters():
+                block_copy._parameters[name] = param.detach().clone().cpu()
+            for name, buf in block_copy.named_buffers():
+                if buf is not None:
+                    block_copy._buffers[name] = buf.detach().clone().cpu()
+            return block_copy
+
+
         def compare_blocks(blocks_before, blocks_after):
             """
             Compare two lists of blocks (before vs after transfer).
@@ -396,16 +412,16 @@ class GPTBase(nn.Module):
                     else:
                         print(f"    Max abs diff: {diff:.6e}")
 
-        # Example usage inside your code
+
+        # === Example usage inside your code ===
         blocks_before = []
         blocks_after = []
 
         for i, block in enumerate(self.transformer["h"]):
-            # Clone block before transfer
-            block_copy = safe_move(block, "cpu")  # ensure on CPU for comparison
-            blocks_before.append(block_copy)
+            # Snapshot block before transfer (CPU clone)
+            blocks_before.append(snapshot_block(block))
 
-            # Move to GPU
+            # Move the *original* block
             if i < mid:
                 moved_block = safe_move(block, "cuda:0")
             else:
