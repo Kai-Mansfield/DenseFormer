@@ -326,20 +326,24 @@ class GPTBase(nn.Module):
         self.transformer["drop"] = safe_move(self.transformer["drop"], "cuda:0")
 
         import copy
+        from torch.nn import Parameter
 
         def snapshot_block(block):
             """
             Take a CPU snapshot of a block's parameters and buffers
             without mutating the original block.
+            Preserves requires_grad.
             """
+            import copy
             block_copy = copy.deepcopy(block)
             for name, param in block_copy.named_parameters():
-                block_copy._parameters[name] = param.detach().clone().cpu()
+                block_copy._parameters[name] = Parameter(
+                    param.detach().clone().cpu(), requires_grad=param.requires_grad
+                )
             for name, buf in block_copy.named_buffers():
                 if buf is not None:
                     block_copy._buffers[name] = buf.detach().clone().cpu()
             return block_copy
-
 
         def compare_blocks(blocks_before, blocks_after):
             """
