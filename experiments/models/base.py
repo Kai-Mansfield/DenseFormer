@@ -296,6 +296,8 @@ class GPTBase(nn.Module):
             print(f'\n wpe_before_{name}.requires_grad', getattr(buf, "requires_grad", False))
             print(f'wpe_before_{name}.device', buf.device)
 
+        print(self.transformer["wpe"].weight.requires_grad)
+
         # Move module to GPU
         self.transformer["wpe"] = safe_move(self.transformer["wpe"], "cuda:0")
 
