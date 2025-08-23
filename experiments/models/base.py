@@ -416,12 +416,12 @@ class GPTBase(nn.Module):
         compare_blocks(blocks_before, blocks_after)
 
         ln_f_before = self.transformer["ln_f"].weight.data.cpu().clone()
-        print('\n ln_f_before.requires_grad', self.transformer["ln_f"].requires_grad)
-        print('ln_f_before.device', self.transformer["ln_f"].device)
+        print('\n ln_f_before.requires_grad', self.transformer["ln_f"].weight.requires_grad)
+        print('ln_f_before.device', self.transformer["ln_f"].weight.device)
         self.transformer["ln_f"] = safe_move(self.transformer["ln_f"], "cuda:1")
         ln_f_after = self.transformer["ln_f"].weight.data.cpu().clone()
-        print('ln_f_after.requires_grad', self.transformer["ln_f"].requires_grad)
-        print('ln_f_after.device', self.transformer["ln_f"].device)
+        print('ln_f_after.requires_grad', self.transformer["ln_f"].weight.requires_grad)
+        print('ln_f_after.device', self.transformer["ln_f"].weight.device)
         diff = torch.abs(ln_f_before - ln_f_after).max().item()
         print("Max difference between ln_f pre and post transfer weights:", diff)
 
