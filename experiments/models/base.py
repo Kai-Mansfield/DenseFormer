@@ -253,7 +253,7 @@ class GPTBase(nn.Module):
 
         # self.transformer.wte = self.transformer.wte.to("cuda:1")
         # self.lm_head = self.lm_head.to("cuda:1")
-        #self.transformer.wte.weight = self.lm_head.weight
+        self.transformer.wte.weight = self.lm_head.weight
 
         # Now move to GPUs selectively
         wte_before = self.transformer["wte"].weight.data.cpu().clone()
@@ -328,7 +328,7 @@ class GPTBase(nn.Module):
         def compare_blocks(blocks_before, blocks_after):
             """
             Compare two lists of blocks (before vs after transfer).
-            Checks parameters, buffers, dtype, requires_grad, training mode, and values.
+            Checks parameters, buffers, dtype, requires_grad, training mode, device, and values.
             """
 
             for i, (before_block, after_block) in enumerate(zip(blocks_before, blocks_after)):
@@ -346,6 +346,9 @@ class GPTBase(nn.Module):
                 ):
                     assert name_before == name_after, "Parameter name mismatch!"
                     print(f"  Param: {name_before}")
+
+                    # Device check
+                    print(f"    Device before: {p_before.device}, after: {p_after.device}")
 
                     # Shape check
                     if p_before.shape != p_after.shape:
@@ -374,6 +377,9 @@ class GPTBase(nn.Module):
                     assert name_before == name_after, "Buffer name mismatch!"
                     print(f"  Buffer: {name_before}")
 
+                    # Device check
+                    print(f"    Device before: {b_before.device}, after: {b_after.device}")
+
                     # Shape check
                     if b_before.shape != b_after.shape:
                         print(f"    Shape mismatch: {b_before.shape} vs {b_after.shape}")
@@ -389,7 +395,6 @@ class GPTBase(nn.Module):
                         print(f"    No diff (OK)")
                     else:
                         print(f"    Max abs diff: {diff:.6e}")
-
 
         # Example usage inside your code
         blocks_before = []
@@ -411,22 +416,22 @@ class GPTBase(nn.Module):
         compare_blocks(blocks_before, blocks_after)
 
         ln_f_before = self.transformer["ln_f"].weight.data.cpu().clone()
-        print('\n ln_f_before.requires_grad', ln_f_before.requires_grad)
-        print('ln_f_before.device', ln_f_before.device)
+        print('\n ln_f_before.requires_grad', self.transformer["ln_f"].requires_grad)
+        print('ln_f_before.device', self.transformer["ln_f"].device)
         self.transformer["ln_f"] = safe_move(self.transformer["ln_f"], "cuda:1")
         ln_f_after = self.transformer["ln_f"].weight.data.cpu().clone()
-        print('ln_f_after.requires_grad', ln_f_after.requires_grad)
-        print('ln_f_after.device', ln_f_after.device)
+        print('ln_f_after.requires_grad', self.transformer["ln_f"].requires_grad)
+        print('ln_f_after.device', self.transformer["ln_f"].device)
         diff = torch.abs(ln_f_before - ln_f_after).max().item()
         print("Max difference between ln_f pre and post transfer weights:", diff)
 
         lm_head_before = self.lm_head.weight.data.cpu().clone()
-        print('\n lm_head_before.requires_grad', lm_head_before.requires_grad)
-        print('lm_head_before.device', lm_head_before.device)
+        print('\n lm_head_before.requires_grad', self.lm_head.requires_grad)
+        print('lm_head_before.device', self.lm_head.device)
         self.lm_head = safe_move(self.lm_head, "cuda:0")
         lm_head_after = self.lm_head.weight.data.cpu().clone()
-        print('lm_head_after.requires_grad', lm_head_after.requires_grad)
-        print('lm_head_after.device', lm_head_after.device)
+        print('lm_head_after.requires_grad', self.lm_head.requires_grad)
+        print('lm_head_after.device', self.lm_head.device)
         diff = torch.abs(lm_head_before - lm_head_after).max().item()
         print("Max difference between lm_head pre and post transfer weights:", diff, '\n')
 
