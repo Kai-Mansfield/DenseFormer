@@ -572,7 +572,35 @@ class GPTBase(nn.Module):
         # print("x max:", x.max().item())
 
         if targets is not None:
+            
+            wte_before = x.data.cpu().clone()
+            requires_grad_before = x.requires_grad
+            device_before = x.device
+
+            # # (Optional) If you have already computed some gradients or want to inspect them,
+            # # you can check:
+            # grad_before = x.grad  # might be None if no backward yet
+
+            # # Now, move the module to cuda:1
             x = safe_move(x, "cuda:0")
+
+            # Get the embedding weights after transfer
+            wte_after = x.data.cpu().clone()
+            requires_grad_after = x.requires_grad
+            device_after = x.device
+
+            # Compare the weights. We compare using .to() to ensure both tensors are on the same device.
+            diff = torch.abs(wte_before - wte_after).max().item()
+            print("Max difference between pre and post transfer weights:", diff)
+
+            # Check devices
+            print("Device before:", device_before)
+            print("Device after:", device_after)
+
+            # Check requires_grad attribute
+            print("Requires grad before:", requires_grad_before)
+            print("Requires grad after:", requires_grad_after)
+
             logits = self.lm_head(x)
             # print(self.lm_head.weight.mean().item(), self.lm_head.weight.std().item())
             targets = safe_move(targets, 'cuda:0')  
