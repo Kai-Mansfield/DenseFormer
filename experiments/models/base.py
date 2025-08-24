@@ -612,7 +612,7 @@ class GPTBase(nn.Module):
             # grad_before = x.grad  # might be None if no backward yet
 
             # # Now, move the module to cuda:1
-            targets = safe_move(targets, "cuda:0")
+            #targets = safe_move(targets, "cuda:0")
 
             # Get the embedding weights after transfer
             wte_after = targets.data.cpu().clone()
