@@ -554,8 +554,8 @@ class GPTBase(nn.Module):
         if torch.isnan(x).any():
                 print(f"NaNs found after x.to(cuda:1)")
 
-        print(type(pos_emb_closure))
-        print(dir(pos_emb_closure))
+        print(type(pos_emb_closure.encoder))
+        print(dir(pos_emb_closure.encoder))
 
         wte_before = pos_emb_closure.data.cpu().clone()
         requires_grad_before = pos_emb_closure.requires_grad
