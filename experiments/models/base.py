@@ -554,8 +554,6 @@ class GPTBase(nn.Module):
         if torch.isnan(x).any():
                 print(f"NaNs found after x.to(cuda:1)")
 
-        import torch
-
         def collect_tensors(obj):
             """
             Collects all parameters and buffers from either:
