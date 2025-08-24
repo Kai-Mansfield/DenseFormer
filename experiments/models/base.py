@@ -496,16 +496,22 @@ class GPTBase(nn.Module):
             index_shift = 0
             cache_context = None
 
-        # Step 2: run on cuda:0 (embeddings + first half blocks)
-        lm_head_before = idx.weight.data.cpu().clone()
-        print('\n lm_head_before.requires_grad', idx.weight.requires_grad)
-        print('lm_head_before.device', idx.weight.device)
+        # Save before state
+        lm_head_before = idx.cpu().clone()
+        print("\nlm_head_before.requires_grad:", idx.requires_grad)
+        print("lm_head_before.device:", idx.device)
+
+        # Move tensor to GPU
         idx = safe_move(idx, "cuda:0")
-        lm_head_after = idx.weight.data.cpu().clone()
-        print('lm_head_after.requires_grad', idx.weight.requires_grad)
-        print('lm_head_after.device', idx.weight.device)
+
+        # Save after state
+        lm_head_after = idx.cpu().clone()
+        print("lm_head_after.requires_grad:", idx.requires_grad)
+        print("lm_head_after.device:", idx.device)
+
+        # Compare values
         diff = torch.abs(lm_head_before - lm_head_after).max().item()
-        print("Max difference between lm_head pre and post transfer weights:", diff, '\n')
+        print("Max difference between lm_head pre and post transfer weights:", diff, "\n")
         
         if getattr(self.transformer.wpe, "needs_iter", False):
             idx, pos_emb_closure = self.transformer.wpe(idx, iter=iter)
