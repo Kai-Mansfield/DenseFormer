@@ -556,47 +556,50 @@ class GPTBase(nn.Module):
 
         # --- Collect all tensors before move ---
         before_tensors = {}
-        for name, param in pos_emb_closure.encoder.named_parameters():
+        for name, param in pos_emb_closure.named_parameters():
             before_tensors[f"param:{name}"] = {
                 "tensor": param.detach().cpu().clone(),
                 "requires_grad": param.requires_grad,
                 "device": param.device,
             }
 
-        for name, buf in pos_emb_closure.encoder.named_buffers():
+        for name, buf in pos_emb_closure.named_buffers():
             before_tensors[f"buffer:{name}"] = {
                 "tensor": buf.detach().cpu().clone(),
-                "requires_grad": buf.requires_grad if hasattr(buf, "requires_grad") else False,
+                "requires_grad": getattr(buf, "requires_grad", False),
                 "device": buf.device,
             }
 
-        # --- Move to cuda:1 ---
+        # --- Move module ---
         pos_emb_closure = safe_move(pos_emb_closure, "cuda:1")
 
         # --- Collect all tensors after move ---
         after_tensors = {}
-        for name, param in pos_emb_closure.encoder.named_parameters():
+        for name, param in pos_emb_closure.named_parameters():
             after_tensors[f"param:{name}"] = {
                 "tensor": param.detach().cpu().clone(),
                 "requires_grad": param.requires_grad,
                 "device": param.device,
             }
 
-        for name, buf in pos_emb_closure.encoder.named_buffers():
+        for name, buf in pos_emb_closure.named_buffers():
             after_tensors[f"buffer:{name}"] = {
                 "tensor": buf.detach().cpu().clone(),
-                "requires_grad": buf.requires_grad if hasattr(buf, "requires_grad") else False,
+                "requires_grad": getattr(buf, "requires_grad", False),
                 "device": buf.device,
             }
 
         # --- Compare ---
-        for key in before_tensors:
-            b, a = before_tensors[key], after_tensors[key]
-            diff = torch.abs(b["tensor"] - a["tensor"]).max().item()
-            print(f"{key}:")
-            print(f"   max diff         = {diff}")
-            print(f"   device before    = {b['device']}, after = {a['device']}")
-            print(f"   requires_grad b4 = {b['requires_grad']}, after = {a['requires_grad']}")
+        if not before_tensors:
+            print("⚠️ No parameters or buffers found in this module.")
+        else:
+            for key in before_tensors:
+                b, a = before_tensors[key], after_tensors[key]
+                diff = torch.abs(b["tensor"] - a["tensor"]).max().item()
+                print(f"{key}:")
+                print(f"   max diff         = {diff}")
+                print(f"   device before    = {b['device']}, after = {a['device']}")
+                print(f"   requires_grad b4 = {b['requires_grad']}, after = {a['requires_grad']}")
 
         for i in range(mid, self.config.n_layer):
             x = self.transformer.h[i](x, pos_emb_closure, cache_context, start_index=index_shift)
