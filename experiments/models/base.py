@@ -296,8 +296,6 @@ class GPTBase(nn.Module):
             print(f'\n wpe_before_{name}.requires_grad', getattr(buf, "requires_grad", False))
             print(f'wpe_before_{name}.device', buf.device)
 
-        print(self.transformer["wpe"].weight.requires_grad)
-
         # Move module to GPU
         self.transformer["wpe"] = safe_move(self.transformer["wpe"], "cuda:0")
 
@@ -499,7 +497,16 @@ class GPTBase(nn.Module):
             cache_context = None
 
         # Step 2: run on cuda:0 (embeddings + first half blocks)
+        lm_head_before = idx.weight.data.cpu().clone()
+        print('\n lm_head_before.requires_grad', idx.weight.requires_grad)
+        print('lm_head_before.device', idx.weight.device)
         idx = safe_move(idx, "cuda:0")
+        lm_head_after = idx.weight.data.cpu().clone()
+        print('lm_head_after.requires_grad', idx.weight.requires_grad)
+        print('lm_head_after.device', idx.weight.device)
+        diff = torch.abs(lm_head_before - lm_head_after).max().item()
+        print("Max difference between lm_head pre and post transfer weights:", diff, '\n')
+        
         if getattr(self.transformer.wpe, "needs_iter", False):
             idx, pos_emb_closure = self.transformer.wpe(idx, iter=iter)
         else:
