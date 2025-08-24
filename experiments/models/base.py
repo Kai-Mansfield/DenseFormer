@@ -554,52 +554,64 @@ class GPTBase(nn.Module):
         if torch.isnan(x).any():
                 print(f"NaNs found after x.to(cuda:1)")
 
-        # --- Collect all tensors before move ---
-        before_tensors = {}
-        for name, param in pos_emb_closure.named_parameters():
-            before_tensors[f"param:{name}"] = {
-                "tensor": param.detach().cpu().clone(),
-                "requires_grad": param.requires_grad,
-                "device": param.device,
-            }
+        import torch
 
-        for name, buf in pos_emb_closure.named_buffers():
-            before_tensors[f"buffer:{name}"] = {
-                "tensor": buf.detach().cpu().clone(),
-                "requires_grad": getattr(buf, "requires_grad", False),
-                "device": buf.device,
-            }
+        def collect_tensors(obj):
+            """
+            Collects all parameters and buffers from either:
+            - a torch.nn.Module, or
+            - a RotaryPositionalEncoderClosure (by unwrapping its .encoder)
+            """
+            if isinstance(obj, torch.nn.Module):
+                params = {f"param:{k}": v for k, v in obj.named_parameters()}
+                buffers = {f"buffer:{k}": v for k, v in obj.named_buffers()}
+                return {**params, **buffers}
+            elif hasattr(obj, "encoder"):  # RotaryPositionalEncoderClosure
+                return collect_tensors(obj.encoder)
+            else:
+                return {}
 
-        # --- Move module ---
-        pos_emb_closure = safe_move(pos_emb_closure, "cuda:1")
 
-        # --- Collect all tensors after move ---
-        after_tensors = {}
-        for name, param in pos_emb_closure.named_parameters():
-            after_tensors[f"param:{name}"] = {
-                "tensor": param.detach().cpu().clone(),
-                "requires_grad": param.requires_grad,
-                "device": param.device,
-            }
+        def compare_tensors(before_obj, after_obj):
+            """
+            Compares all collected tensors (params + buffers) between before and after.
+            """
+            before = collect_tensors(before_obj)
+            after = collect_tensors(after_obj)
 
-        for name, buf in pos_emb_closure.named_buffers():
-            after_tensors[f"buffer:{name}"] = {
-                "tensor": buf.detach().cpu().clone(),
-                "requires_grad": getattr(buf, "requires_grad", False),
-                "device": buf.device,
-            }
+            for name in before.keys():
+                if name not in after:
+                    print(f"{name} missing in 'after'")
+                    continue
 
-        # --- Compare ---
-        if not before_tensors:
-            print("⚠️ No parameters or buffers found in this module.")
-        else:
-            for key in before_tensors:
-                b, a = before_tensors[key], after_tensors[key]
-                diff = torch.abs(b["tensor"] - a["tensor"]).max().item()
-                print(f"{key}:")
+                p_before, p_after = before[name], after[name]
+
+                # Compare values
+                diff = torch.abs(p_before.detach().cpu() - p_after.detach().cpu()).max().item()
+
+                # Compare devices
+                device_before = p_before.device
+                device_after = p_after.device
+
+                # Compare requires_grad (only if it's a parameter)
+                requires_grad_before = getattr(p_before, "requires_grad", None)
+                requires_grad_after = getattr(p_after, "requires_grad", None)
+
+                print(f"{name}:")
                 print(f"   max diff         = {diff}")
-                print(f"   device before    = {b['device']}, after = {a['device']}")
-                print(f"   requires_grad b4 = {b['requires_grad']}, after = {a['requires_grad']}")
+                print(f"   device before    = {device_before}, after = {device_after}")
+                if requires_grad_before is not None:
+                    print(f"   requires_grad b4 = {requires_grad_before}, after = {requires_grad_after}")
+
+
+        # === Example usage ===
+        # Take a snapshot before moving
+        before_obj = pos_emb_closure
+        # Move to cuda:1
+        after_obj = safe_move(pos_emb_closure, "cuda:1")
+
+        # Compare
+        compare_tensors(before_obj, after_obj)
 
         for i in range(mid, self.config.n_layer):
             x = self.transformer.h[i](x, pos_emb_closure, cache_context, start_index=index_shift)
