@@ -621,15 +621,15 @@ class GPTBase(nn.Module):
 
             # Compare the weights. We compare using .to() to ensure both tensors are on the same device.
             diff = torch.abs(wte_before - wte_after).max().item()
-            print("Max difference between pre and post transfer weights:", diff)
+            print("Max difference between pre taregts and post taregts transfer weights:", diff)
 
             # Check devices
-            print("Device before:", device_before)
-            print("Device after:", device_after)
+            print("taregts Device before:", device_before)
+            print("targets Device after:", device_after)
 
             # Check requires_grad attribute
-            print("Requires grad before:", requires_grad_before)
-            print("Requires grad after:", requires_grad_after)
+            print("targets Requires grad before:", requires_grad_before)
+            print("taregts Requires grad after:", requires_grad_after)
 
             logits = safe_move(logits, 'cuda:0')  
             # print('self.lm_head.weight.device', self.lm_head.weight.device)  # ensure targets are on the same device as lm_head 
