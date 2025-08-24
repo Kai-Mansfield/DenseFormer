@@ -495,23 +495,6 @@ class GPTBase(nn.Module):
         else:
             index_shift = 0
             cache_context = None
-
-        # Save before state
-        lm_head_before = idx.cpu().clone()
-        print("\nlm_head_before.requires_grad:", idx.requires_grad)
-        print("lm_head_before.device:", idx.device)
-
-        # Move tensor to GPU
-        idx = safe_move(idx, "cuda:0")
-
-        # Save after state
-        lm_head_after = idx.cpu().clone()
-        print("lm_head_after.requires_grad:", idx.requires_grad)
-        print("lm_head_after.device:", idx.device)
-
-        # Compare values
-        diff = torch.abs(lm_head_before - lm_head_after).max().item()
-        print("Max difference between lm_head pre and post transfer weights:", diff, "\n")
         
         if getattr(self.transformer.wpe, "needs_iter", False):
             idx, pos_emb_closure = self.transformer.wpe(idx, iter=iter)
@@ -539,9 +522,9 @@ class GPTBase(nn.Module):
 
         # Assume self.transformer.wte is initially on cuda:0.
         # Get the embedding weights before transfer
-        # wte_before = x.data.cpu().clone()
-        # requires_grad_before = x.requires_grad
-        # device_before = x.device
+        wte_before = x.data.cpu().clone()
+        requires_grad_before = x.requires_grad
+        device_before = x.device
 
         # # (Optional) If you have already computed some gradients or want to inspect them,
         # # you can check:
@@ -550,30 +533,22 @@ class GPTBase(nn.Module):
         # # Now, move the module to cuda:1
         x = safe_move(x, "cuda:1")
 
-        # # Get the embedding weights after transfer
-        # wte_after = x.data.clone()
-        # requires_grad_after = x.requires_grad
-        # device_after = x.device
+        # Get the embedding weights after transfer
+        wte_after = x.data.cpu().clone()
+        requires_grad_after = x.requires_grad
+        device_after = x.device
 
-        # # Compare the weights. We compare using .to() to ensure both tensors are on the same device.
-        # diff = torch.abs(safe_move(wte_before, 'cuda:1') - wte_after).max().item()
-        # print("Max difference between pre and post transfer weights:", diff)
+        # Compare the weights. We compare using .to() to ensure both tensors are on the same device.
+        diff = torch.abs(wte_before - wte_after).max().item()
+        print("Max difference between pre and post transfer weights:", diff)
 
-        # # Check devices
-        # print("Device before:", device_before)
-        # print("Device after:", device_after)
+        # Check devices
+        print("Device before:", device_before)
+        print("Device after:", device_after)
 
-        # # Check requires_grad attribute
-        # print("Requires grad before:", requires_grad_before)
-        # print("Requires grad after:", requires_grad_after)
-
-        # # If gradients already exist, you can compare those as well.
-        # if grad_before is not None:
-        #     # Make sure grad_before is moved to the correct device for comparison.
-        #     grad_diff = torch.abs(grad_before.to(device_after) - x.grad).max().item()
-        #     print("Max difference in gradients:", grad_diff)
-        # else:
-        #     print("No gradients available before transfer (or they are None).")
+        # Check requires_grad attribute
+        print("Requires grad before:", requires_grad_before)
+        print("Requires grad after:", requires_grad_after)
 
         #print("x after move", x.min(), x.max(), x.dtype)
         if torch.isnan(x).any():
