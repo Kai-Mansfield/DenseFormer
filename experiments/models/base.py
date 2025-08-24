@@ -554,36 +554,49 @@ class GPTBase(nn.Module):
         if torch.isnan(x).any():
                 print(f"NaNs found after x.to(cuda:1)")
 
-        print(type(pos_emb_closure.encoder))
-        print(dir(pos_emb_closure.encoder))
+        # --- Collect all tensors before move ---
+        before_tensors = {}
+        for name, param in pos_emb_closure.encoder.named_parameters():
+            before_tensors[f"param:{name}"] = {
+                "tensor": param.detach().cpu().clone(),
+                "requires_grad": param.requires_grad,
+                "device": param.device,
+            }
 
-        wte_before = pos_emb_closure.data.cpu().clone()
-        requires_grad_before = pos_emb_closure.requires_grad
-        device_before = pos_emb_closure.device
+        for name, buf in pos_emb_closure.encoder.named_buffers():
+            before_tensors[f"buffer:{name}"] = {
+                "tensor": buf.detach().cpu().clone(),
+                "requires_grad": buf.requires_grad if hasattr(buf, "requires_grad") else False,
+                "device": buf.device,
+            }
 
-        # # (Optional) If you have already computed some gradients or want to inspect them,
-        # # you can check:
-        # grad_before = x.grad  # might be None if no backward yet
-
-        # # Now, move the module to cuda:1
+        # --- Move to cuda:1 ---
         pos_emb_closure = safe_move(pos_emb_closure, "cuda:1")
 
-        # Get the embedding weights after transfer
-        wte_after = pos_emb_closure.data.cpu().clone()
-        requires_grad_after = pos_emb_closure.requires_grad
-        device_after = pos_emb_closure.device
+        # --- Collect all tensors after move ---
+        after_tensors = {}
+        for name, param in pos_emb_closure.encoder.named_parameters():
+            after_tensors[f"param:{name}"] = {
+                "tensor": param.detach().cpu().clone(),
+                "requires_grad": param.requires_grad,
+                "device": param.device,
+            }
 
-        # Compare the weights. We compare using .to() to ensure both tensors are on the same device.
-        diff = torch.abs(wte_before - wte_after).max().item()
-        print("Max difference between pos_emb_closure pre and post transfer weights:", diff)
+        for name, buf in pos_emb_closure.encoder.named_buffers():
+            after_tensors[f"buffer:{name}"] = {
+                "tensor": buf.detach().cpu().clone(),
+                "requires_grad": buf.requires_grad if hasattr(buf, "requires_grad") else False,
+                "device": buf.device,
+            }
 
-        # Check devices
-        print("pos_emb_closure Device before:", device_before)
-        print("pos_emb_closure Device after:", device_after)
-
-        # Check requires_grad attribute
-        print("pos_emb_closure Requires grad before:", requires_grad_before)
-        print("pos_emb_closure Requires grad after:", requires_grad_after)
+        # --- Compare ---
+        for key in before_tensors:
+            b, a = before_tensors[key], after_tensors[key]
+            diff = torch.abs(b["tensor"] - a["tensor"]).max().item()
+            print(f"{key}:")
+            print(f"   max diff         = {diff}")
+            print(f"   device before    = {b['device']}, after = {a['device']}")
+            print(f"   requires_grad b4 = {b['requires_grad']}, after = {a['requires_grad']}")
 
         for i in range(mid, self.config.n_layer):
             x = self.transformer.h[i](x, pos_emb_closure, cache_context, start_index=index_shift)
