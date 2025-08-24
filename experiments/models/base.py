@@ -602,8 +602,7 @@ class GPTBase(nn.Module):
             print("Requires grad after:", requires_grad_after)
 
             logits = self.lm_head(x)
-            print('logits dev', logits.device)
-            logits = safe_move(logits, 'cuda:0')  
+            #logits = safe_move(logits, 'cuda:0')  
             # print('self.lm_head.weight.device', self.lm_head.weight.device)  # ensure targets are on the same device as lm_head 
             # print("Logits size:", logits.size())
             # print('tragets size:', targets.size())
