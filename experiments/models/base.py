@@ -255,205 +255,190 @@ class GPTBase(nn.Module):
         # self.lm_head = self.lm_head.to("cuda:1")
         self.transformer.wte.weight = self.lm_head.weight
 
-        # Now move to GPUs selectively
-        wte_before = self.transformer["wte"].weight.data.cpu().clone()
-        print('\n wte_before.requires_grad', self.transformer["wte"].weight.requires_grad)
-        print('wte_before.device', self.transformer["wte"].weight.device)
+        # # Now move to GPUs selectively
+        # wte_before = self.transformer["wte"].weight.data.cpu().clone()
+        # print('\n wte_before.requires_grad', self.transformer["wte"].weight.requires_grad)
+        # print('wte_before.device', self.transformer["wte"].weight.device)
         self.transformer["wte"]  = safe_move(self.transformer["wte"], "cuda:0")
-        #self.transformer.wte.weight = self.lm_head.weight
-        wte_after = self.transformer["wte"].weight.data.cpu().clone()
-        print('wte_after.requires_grad', self.transformer["wte"].weight.requires_grad)
-        print('wte_after.device', self.transformer["wte"].weight.device)
-        diff = torch.abs(wte_before - wte_after).max().item()
-        print("Max difference between wte pre and post transfer weights:", diff)
+        # #self.transformer.wte.weight = self.lm_head.weight
+        # wte_after = self.transformer["wte"].weight.data.cpu().clone()
+        # print('wte_after.requires_grad', self.transformer["wte"].weight.requires_grad)
+        # print('wte_after.device', self.transformer["wte"].weight.device)
+        # diff = torch.abs(wte_before - wte_after).max().item()
+        # print("Max difference between wte pre and post transfer weights:", diff)
 
-        # wpe_before = []
-        # for name, param in self.transformer["wpe"].named_parameters():
-        #     wpe_before.append(param.data.cpu().clone())
-        #     print(f'wpe_before_{name}.requires_grad', param.requires_grad)
-        #     print(f'wpe_before_{name}.device', param.device)
-        # self.transformer["wpe"]  = safe_move(self.transformer["wpe"], "cuda:0")
-        # wpe_after = []
-        # for name, param in self.transformer["wpe"].named_parameters():
-        #     wpe_after.append(param.data.cpu().clone())
-        #     print(f'wpe_after_{name}.requires_grad', param.requires_grad)
-        #     print(f'wpe_after_{name}.device', param.device)
-        # for name, (before, after) in zip(self.transformer["wpe"].named_parameters(), zip(wpe_before, wpe_after)):
-        #     print(f"Checking {name} weights:")
-        #     print("Before transfer min/max:", before.min().item(), before.max().item())
-        #     print("After transfer min/max:", after.min().item(), after.max().item())
-        #     if before.shape != after.shape:
-        #         print(f"Shape mismatch for {name}: {before.shape} vs {after.shape}")
-        #     else:
-        #         print(f"Shape match for {name}: {before.shape}")
-        #     diff = torch.abs(before - after).max().item()
-        #     print("Max difference between wpe pre and post transfer weights:", diff)
-
-        # Collect all buffers before transfer (on CPU)
-        wpe_before = {}
-        for name, buf in self.transformer["wpe"].named_buffers():
-            wpe_before[name] = buf.cpu().clone()
-            print(f'\n wpe_before_{name}.requires_grad', getattr(buf, "requires_grad", False))
-            print(f'wpe_before_{name}.device', buf.device)
+        # wpe_before = {}
+        # for name, buf in self.transformer["wpe"].named_buffers():
+        #     wpe_before[name] = buf.cpu().clone()
+        #     print(f'\n wpe_before_{name}.requires_grad', getattr(buf, "requires_grad", False))
+        #     print(f'wpe_before_{name}.device', buf.device)
 
         # Move module to GPU
         self.transformer["wpe"] = safe_move(self.transformer["wpe"], "cuda:0")
 
-        # Collect all buffers after transfer (on CPU for comparison)
-        wpe_after = {}
-        for name, buf in self.transformer["wpe"].named_buffers():
-            wpe_after[name] = buf.cpu().clone()
-            print(f'wpe_after_{name}.requires_grad', getattr(buf, "requires_grad", False))
-            print(f'wpe_after_{name}.device', buf.device)
+        # # Collect all buffers after transfer (on CPU for comparison)
+        # wpe_after = {}
+        # for name, buf in self.transformer["wpe"].named_buffers():
+        #     wpe_after[name] = buf.cpu().clone()
+        #     print(f'wpe_after_{name}.requires_grad', getattr(buf, "requires_grad", False))
+        #     print(f'wpe_after_{name}.device', buf.device)
 
-        # Compare before vs after
-        for name in wpe_before.keys():
-            before = wpe_before[name]
-            after = wpe_after[name]
+        # # Compare before vs after
+        # for name in wpe_before.keys():
+        #     before = wpe_before[name]
+        #     after = wpe_after[name]
 
-            if before.shape != after.shape:
-                print(f"\n Shape mismatch: {before.shape} vs {after.shape}")
-            else:
-                print(f"\n Shape match: {before.shape}")
-            diff = torch.abs(before - after).max().item()
-            print("Max difference pre/post transfer:", diff)
+        #     if before.shape != after.shape:
+        #         print(f"\n Shape mismatch: {before.shape} vs {after.shape}")
+        #     else:
+        #         print(f"\n Shape match: {before.shape}")
+        #     diff = torch.abs(before - after).max().item()
+        #     print("Max difference pre/post transfer:", diff)
 
-        print("wpe type:", type(self.transformer["drop"]))
-        print("wpe children:", list(self.transformer["drop"].children()))
-        print("wpe named parameters:", list(self.transformer["drop"].named_parameters()))
-        print("wpe named buffers:", list(self.transformer["drop"].named_buffers()), '\n')
+        # print("wpe type:", type(self.transformer["drop"]))
+        # print("wpe children:", list(self.transformer["drop"].children()))
+        # print("wpe named parameters:", list(self.transformer["drop"].named_parameters()))
+        # print("wpe named buffers:", list(self.transformer["drop"].named_buffers()), '\n')
 
         self.transformer["drop"] = safe_move(self.transformer["drop"], "cuda:0")
 
-        import copy
-        from torch.nn import Parameter
+        # import copy
+        # from torch.nn import Parameter
 
-        def snapshot_block(block):
-            """
-            Take a CPU snapshot of a block's parameters and buffers
-            without mutating the original block.
-            Preserves requires_grad.
-            """
-            import copy
-            block_copy = copy.deepcopy(block)
-            for name, param in block_copy.named_parameters():
-                block_copy._parameters[name] = Parameter(
-                    param.detach().clone().cpu(), requires_grad=param.requires_grad
-                )
-            for name, buf in block_copy.named_buffers():
-                if buf is not None:
-                    block_copy._buffers[name] = buf.detach().clone().cpu()
-            return block_copy
+        # def snapshot_block(block):
+        #     """
+        #     Take a CPU snapshot of a block's parameters and buffers
+        #     without mutating the original block.
+        #     Preserves requires_grad.
+        #     """
+        #     import copy
+        #     block_copy = copy.deepcopy(block)
+        #     for name, param in block_copy.named_parameters():
+        #         block_copy._parameters[name] = Parameter(
+        #             param.detach().clone().cpu(), requires_grad=param.requires_grad
+        #         )
+        #     for name, buf in block_copy.named_buffers():
+        #         if buf is not None:
+        #             block_copy._buffers[name] = buf.detach().clone().cpu()
+        #     return block_copy
 
-        def compare_blocks(blocks_before, blocks_after):
-            """
-            Compare two lists of blocks (before vs after transfer).
-            Checks parameters, buffers, dtype, requires_grad, training mode, device, and values.
-            """
+        # def compare_blocks(blocks_before, blocks_after):
+        #     """
+        #     Compare two lists of blocks (before vs after transfer).
+        #     Checks parameters, buffers, dtype, requires_grad, training mode, device, and values.
+        #     """
 
-            for i, (before_block, after_block) in enumerate(zip(blocks_before, blocks_after)):
-                print(f"\n=== Checking Block {i} ===")
+        #     for i, (before_block, after_block) in enumerate(zip(blocks_before, blocks_after)):
+        #         print(f"\n=== Checking Block {i} ===")
 
-                # ---- Module-level state ----
-                if before_block.training != after_block.training:
-                    print(f"  Training mode mismatch: {before_block.training} vs {after_block.training}")
-                else:
-                    print(f"  Training mode: {before_block.training} (OK)")
+        #         # ---- Module-level state ----
+        #         if before_block.training != after_block.training:
+        #             print(f"  Training mode mismatch: {before_block.training} vs {after_block.training}")
+        #         else:
+        #             print(f"  Training mode: {before_block.training} (OK)")
 
-                # ---- Parameters ----
-                for (name_before, p_before), (name_after, p_after) in zip(
-                    before_block.named_parameters(), after_block.named_parameters()
-                ):
-                    assert name_before == name_after, "Parameter name mismatch!"
-                    print(f"  Param: {name_before}")
+        #         # ---- Parameters ----
+        #         for (name_before, p_before), (name_after, p_after) in zip(
+        #             before_block.named_parameters(), after_block.named_parameters()
+        #         ):
+        #             assert name_before == name_after, "Parameter name mismatch!"
+        #             print(f"  Param: {name_before}")
 
-                    # Device check
-                    print(f"    Device before: {p_before.device}, after: {p_after.device}")
+        #             # Device check
+        #             print(f"    Device before: {p_before.device}, after: {p_after.device}")
 
-                    # Shape check
-                    if p_before.shape != p_after.shape:
-                        print(f"    Shape mismatch: {p_before.shape} vs {p_after.shape}")
-                        continue
+        #             # Shape check
+        #             if p_before.shape != p_after.shape:
+        #                 print(f"    Shape mismatch: {p_before.shape} vs {p_after.shape}")
+        #                 continue
 
-                    # Dtype check
-                    if p_before.dtype != p_after.dtype:
-                        print(f"    Dtype mismatch: {p_before.dtype} vs {p_after.dtype}")
+        #             # Dtype check
+        #             if p_before.dtype != p_after.dtype:
+        #                 print(f"    Dtype mismatch: {p_before.dtype} vs {p_after.dtype}")
 
-                    # requires_grad check
-                    if p_before.requires_grad != p_after.requires_grad:
-                        print(f"    requires_grad mismatch: {p_before.requires_grad} vs {p_after.requires_grad}")
+        #             # requires_grad check
+        #             if p_before.requires_grad != p_after.requires_grad:
+        #                 print(f"    requires_grad mismatch: {p_before.requires_grad} vs {p_after.requires_grad}")
 
-                    # Value check
-                    diff = torch.abs(p_before.detach().cpu() - p_after.detach().cpu()).max().item()
-                    if diff == 0.0:
-                        print(f"    No diff (OK)")
-                    else:
-                        print(f"    Max abs diff: {diff:.6e}")
+        #             # Value check
+        #             diff = torch.abs(p_before.detach().cpu() - p_after.detach().cpu()).max().item()
+        #             if diff == 0.0:
+        #                 print(f"    No diff (OK)")
+        #             else:
+        #                 print(f"    Max abs diff: {diff:.6e}")
 
-                # ---- Buffers ----
-                for (name_before, b_before), (name_after, b_after) in zip(
-                    before_block.named_buffers(), after_block.named_buffers()
-                ):
-                    assert name_before == name_after, "Buffer name mismatch!"
-                    print(f"  Buffer: {name_before}")
+        #         # ---- Buffers ----
+        #         for (name_before, b_before), (name_after, b_after) in zip(
+        #             before_block.named_buffers(), after_block.named_buffers()
+        #         ):
+        #             assert name_before == name_after, "Buffer name mismatch!"
+        #             print(f"  Buffer: {name_before}")
 
-                    # Device check
-                    print(f"    Device before: {b_before.device}, after: {b_after.device}")
+        #             # Device check
+        #             print(f"    Device before: {b_before.device}, after: {b_after.device}")
 
-                    # Shape check
-                    if b_before.shape != b_after.shape:
-                        print(f"    Shape mismatch: {b_before.shape} vs {b_after.shape}")
-                        continue
+        #             # Shape check
+        #             if b_before.shape != b_after.shape:
+        #                 print(f"    Shape mismatch: {b_before.shape} vs {b_after.shape}")
+        #                 continue
 
-                    # Dtype check
-                    if b_before.dtype != b_after.dtype:
-                        print(f"    Dtype mismatch: {b_before.dtype} vs {b_after.dtype}")
+        #             # Dtype check
+        #             if b_before.dtype != b_after.dtype:
+        #                 print(f"    Dtype mismatch: {b_before.dtype} vs {b_after.dtype}")
 
-                    # Value check
-                    diff = torch.abs(b_before.detach().cpu() - b_after.detach().cpu()).max().item()
-                    if diff == 0.0:
-                        print(f"    No diff (OK)")
-                    else:
-                        print(f"    Max abs diff: {diff:.6e}")
+        #             # Value check
+        #             diff = torch.abs(b_before.detach().cpu() - b_after.detach().cpu()).max().item()
+        #             if diff == 0.0:
+        #                 print(f"    No diff (OK)")
+        #             else:
+        #                 print(f"    Max abs diff: {diff:.6e}")
 
 
-        # === Example usage inside your code ===
-        blocks_before = []
-        blocks_after = []
+        # # === Example usage inside your code ===
+        # blocks_before = []
+        # blocks_after = []
+
+        # for i, block in enumerate(self.transformer["h"]):
+        #     # Snapshot block before transfer (CPU clone)
+        #     blocks_before.append(snapshot_block(block))
+
+        #     # Move the *original* block
+        #     if i < mid:
+        #         moved_block = safe_move(block, "cuda:0")
+        #     else:
+        #         moved_block = safe_move(block, "cuda:1")
+        #     blocks_after.append(moved_block)
 
         for i, block in enumerate(self.transformer["h"]):
-            # Snapshot block before transfer (CPU clone)
-            blocks_before.append(snapshot_block(block))
 
-            # Move the *original* block
+            # Move the *original* block and replace it in-place
             if i < mid:
-                moved_block = safe_move(block, "cuda:0")
+                self.transformer["h"][i] = safe_move(block, "cuda:0")
             else:
-                moved_block = safe_move(block, "cuda:1")
-            blocks_after.append(moved_block)
+                self.transformer["h"][i] = safe_move(block, "cuda:1")
 
         # Run the comparison
-        compare_blocks(blocks_before, blocks_after)
+        # compare_blocks(blocks_before, blocks_after)
 
-        ln_f_before = self.transformer["ln_f"].weight.data.cpu().clone()
-        print('\n ln_f_before.requires_grad', self.transformer["ln_f"].weight.requires_grad)
-        print('ln_f_before.device', self.transformer["ln_f"].weight.device)
+        # ln_f_before = self.transformer["ln_f"].weight.data.cpu().clone()
+        # print('\n ln_f_before.requires_grad', self.transformer["ln_f"].weight.requires_grad)
+        # print('ln_f_before.device', self.transformer["ln_f"].weight.device)
         self.transformer["ln_f"] = safe_move(self.transformer["ln_f"], "cuda:1")
-        ln_f_after = self.transformer["ln_f"].weight.data.cpu().clone()
-        print('ln_f_after.requires_grad', self.transformer["ln_f"].weight.requires_grad)
-        print('ln_f_after.device', self.transformer["ln_f"].weight.device)
-        diff = torch.abs(ln_f_before - ln_f_after).max().item()
-        print("Max difference between ln_f pre and post transfer weights:", diff)
+        # ln_f_after = self.transformer["ln_f"].weight.data.cpu().clone()
+        # print('ln_f_after.requires_grad', self.transformer["ln_f"].weight.requires_grad)
+        # print('ln_f_after.device', self.transformer["ln_f"].weight.device)
+        # diff = torch.abs(ln_f_before - ln_f_after).max().item()
+        # print("Max difference between ln_f pre and post transfer weights:", diff)
 
-        lm_head_before = self.lm_head.weight.data.cpu().clone()
-        print('\n lm_head_before.requires_grad', self.lm_head.weight.requires_grad)
-        print('lm_head_before.device', self.lm_head.weight.device)
+        # lm_head_before = self.lm_head.weight.data.cpu().clone()
+        # print('\n lm_head_before.requires_grad', self.lm_head.weight.requires_grad)
+        # print('lm_head_before.device', self.lm_head.weight.device)
         self.lm_head = safe_move(self.lm_head, "cuda:0")
-        lm_head_after = self.lm_head.weight.data.cpu().clone()
-        print('lm_head_after.requires_grad', self.lm_head.weight.requires_grad)
-        print('lm_head_after.device', self.lm_head.weight.device)
-        diff = torch.abs(lm_head_before - lm_head_after).max().item()
-        print("Max difference between lm_head pre and post transfer weights:", diff, '\n')
+        # lm_head_after = self.lm_head.weight.data.cpu().clone()
+        # print('lm_head_after.requires_grad', self.lm_head.weight.requires_grad)
+        # print('lm_head_after.device', self.lm_head.weight.device)
+        # diff = torch.abs(lm_head_before - lm_head_after).max().item()
+        # print("Max difference between lm_head pre and post transfer weights:", diff, '\n')
 
         # Initialize all weights
         self.apply(self._init_weights)
@@ -522,9 +507,9 @@ class GPTBase(nn.Module):
 
         # Assume self.transformer.wte is initially on cuda:0.
         # Get the embedding weights before transfer
-        wte_before = x.data.cpu().clone()
-        requires_grad_before = x.requires_grad
-        device_before = x.device
+        # wte_before = x.data.cpu().clone()
+        # requires_grad_before = x.requires_grad
+        # device_before = x.device
 
         # # (Optional) If you have already computed some gradients or want to inspect them,
         # # you can check:
@@ -534,82 +519,84 @@ class GPTBase(nn.Module):
         x = safe_move(x, "cuda:1")
 
         # Get the embedding weights after transfer
-        wte_after = x.data.cpu().clone()
-        requires_grad_after = x.requires_grad
-        device_after = x.device
+        # wte_after = x.data.cpu().clone()
+        # requires_grad_after = x.requires_grad
+        # device_after = x.device
 
-        # Compare the weights. We compare using .to() to ensure both tensors are on the same device.
-        diff = torch.abs(wte_before - wte_after).max().item()
-        print("Max difference between pre and post transfer weights:", diff)
+        # # Compare the weights. We compare using .to() to ensure both tensors are on the same device.
+        # diff = torch.abs(wte_before - wte_after).max().item()
+        # print("Max difference between pre and post transfer weights:", diff)
 
-        # Check devices
-        print("Device before:", device_before)
-        print("Device after:", device_after)
+        # # Check devices
+        # print("Device before:", device_before)
+        # print("Device after:", device_after)
 
-        # Check requires_grad attribute
-        print("Requires grad before:", requires_grad_before)
-        print("Requires grad after:", requires_grad_after)
+        # # Check requires_grad attribute
+        # print("Requires grad before:", requires_grad_before)
+        # print("Requires grad after:", requires_grad_after)
 
-        #print("x after move", x.min(), x.max(), x.dtype)
-        if torch.isnan(x).any():
-                print(f"NaNs found after x.to(cuda:1)")
+        # #print("x after move", x.min(), x.max(), x.dtype)
+        # if torch.isnan(x).any():
+        #         print(f"NaNs found after x.to(cuda:1)")
 
-        def collect_tensors(obj):
-            """
-            Collects all parameters and buffers from either:
-            - a torch.nn.Module, or
-            - a RotaryPositionalEncoderClosure (by unwrapping its .encoder)
-            """
-            if isinstance(obj, torch.nn.Module):
-                params = {f"param:{k}": v for k, v in obj.named_parameters()}
-                buffers = {f"buffer:{k}": v for k, v in obj.named_buffers()}
-                return {**params, **buffers}
-            elif hasattr(obj, "encoder"):  # RotaryPositionalEncoderClosure
-                return collect_tensors(obj.encoder)
-            else:
-                return {}
-
-
-        def compare_tensors(before_obj, after_obj):
-            """
-            Compares all collected tensors (params + buffers) between before and after.
-            """
-            before = collect_tensors(before_obj)
-            after = collect_tensors(after_obj)
-
-            for name in before.keys():
-                if name not in after:
-                    print(f"{name} missing in 'after'")
-                    continue
-
-                p_before, p_after = before[name], after[name]
-
-                # Compare values
-                diff = torch.abs(p_before.detach().cpu() - p_after.detach().cpu()).max().item()
-
-                # Compare devices
-                device_before = p_before.device
-                device_after = p_after.device
-
-                # Compare requires_grad (only if it's a parameter)
-                requires_grad_before = getattr(p_before, "requires_grad", None)
-                requires_grad_after = getattr(p_after, "requires_grad", None)
-
-                print(f"{name}:")
-                print(f"   max diff         = {diff}")
-                print(f"   device before    = {device_before}, after = {device_after}")
-                if requires_grad_before is not None:
-                    print(f"   requires_grad b4 = {requires_grad_before}, after = {requires_grad_after}")
+        # def collect_tensors(obj):
+        #     """
+        #     Collects all parameters and buffers from either:
+        #     - a torch.nn.Module, or
+        #     - a RotaryPositionalEncoderClosure (by unwrapping its .encoder)
+        #     """
+        #     if isinstance(obj, torch.nn.Module):
+        #         params = {f"param:{k}": v for k, v in obj.named_parameters()}
+        #         buffers = {f"buffer:{k}": v for k, v in obj.named_buffers()}
+        #         return {**params, **buffers}
+        #     elif hasattr(obj, "encoder"):  # RotaryPositionalEncoderClosure
+        #         return collect_tensors(obj.encoder)
+        #     else:
+        #         return {}
 
 
-        # === Example usage ===
-        # Take a snapshot before moving
-        before_obj = pos_emb_closure
-        # Move to cuda:1
-        after_obj = safe_move(pos_emb_closure, "cuda:1")
+        # def compare_tensors(before_obj, after_obj):
+        #     """
+        #     Compares all collected tensors (params + buffers) between before and after.
+        #     """
+        #     before = collect_tensors(before_obj)
+        #     after = collect_tensors(after_obj)
 
-        # Compare
-        compare_tensors(before_obj, after_obj)
+        #     for name in before.keys():
+        #         if name not in after:
+        #             print(f"{name} missing in 'after'")
+        #             continue
+
+        #         p_before, p_after = before[name], after[name]
+
+        #         # Compare values
+        #         diff = torch.abs(p_before.detach().cpu() - p_after.detach().cpu()).max().item()
+
+        #         # Compare devices
+        #         device_before = p_before.device
+        #         device_after = p_after.device
+
+        #         # Compare requires_grad (only if it's a parameter)
+        #         requires_grad_before = getattr(p_before, "requires_grad", None)
+        #         requires_grad_after = getattr(p_after, "requires_grad", None)
+
+        #         print(f"{name}:")
+        #         print(f"   max diff         = {diff}")
+        #         print(f"   device before    = {device_before}, after = {device_after}")
+        #         if requires_grad_before is not None:
+        #             print(f"   requires_grad b4 = {requires_grad_before}, after = {requires_grad_after}")
+
+
+        # # === Example usage ===
+        # # Take a snapshot before moving
+        # before_obj = pos_emb_closure
+        # # Move to cuda:1
+        # after_obj = safe_move(pos_emb_closure, "cuda:1")
+
+        # # Compare
+        # compare_tensors(before_obj, after_obj)
+
+        pos_emb_closure = safe_move(pos_emb_closure, "cuda:1")
 
         for i in range(mid, self.config.n_layer):
             x = self.transformer.h[i](x, pos_emb_closure, cache_context, start_index=index_shift)
@@ -629,9 +616,9 @@ class GPTBase(nn.Module):
 
         if targets is not None:
             
-            wte_before = x.data.cpu().clone()
-            requires_grad_before = x.requires_grad
-            device_before = x.device
+            # wte_before = x.data.cpu().clone()
+            # requires_grad_before = x.requires_grad
+            # device_before = x.device
 
             # # (Optional) If you have already computed some gradients or want to inspect them,
             # # you can check:
@@ -641,21 +628,21 @@ class GPTBase(nn.Module):
             x = safe_move(x, "cuda:0")
 
             # Get the embedding weights after transfer
-            wte_after = x.data.cpu().clone()
-            requires_grad_after = x.requires_grad
-            device_after = x.device
+            # wte_after = x.data.cpu().clone()
+            # requires_grad_after = x.requires_grad
+            # device_after = x.device
 
-            # Compare the weights. We compare using .to() to ensure both tensors are on the same device.
-            diff = torch.abs(wte_before - wte_after).max().item()
-            print("Max difference between pre and post transfer weights:", diff)
+            # # Compare the weights. We compare using .to() to ensure both tensors are on the same device.
+            # diff = torch.abs(wte_before - wte_after).max().item()
+            # print("Max difference between pre and post transfer weights:", diff)
 
-            # Check devices
-            print("Device before:", device_before)
-            print("Device after:", device_after)
+            # # Check devices
+            # print("Device before:", device_before)
+            # print("Device after:", device_after)
 
-            # Check requires_grad attribute
-            print("Requires grad before:", requires_grad_before)
-            print("Requires grad after:", requires_grad_after)
+            # # Check requires_grad attribute
+            # print("Requires grad before:", requires_grad_before)
+            # print("Requires grad after:", requires_grad_after)
 
             logits = self.lm_head(x)
             loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
