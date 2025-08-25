@@ -93,17 +93,19 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
                         outputs = model(x, targets=y)
 
             loss = outputs['loss']
-            for name, param in model.named_parameters():
-                if torch.isnan(param).any():
+            for i, (name, p) in enumerate(model.named_parameters()):
+                print(i, name, p.device, p.requires_grad)
+                if torch.isnan(p).any():
                     print(f"NaN detected in parameter be4 loss: {name}")
-                if torch.isinf(param).any():
+                if torch.isinf(p).any():
                     print(f"Inf detected in parameter be4 loss: {name}")
             # print('finished cheking for inf and nans in parameters be4 loss')
             loss.backward()
-            for name, param in model.named_parameters():
-                if torch.isnan(param).any():
+            for i, (name, p) in enumerate(model.named_parameters()):
+                print(i, name, p.device, p.requires_grad)
+                if torch.isnan(p).any():
                     print(f"NaN detected in parameter after loss: {name}")
-                if torch.isinf(param).any():
+                if torch.isinf(p).any():
                     print(f"Inf detected in parameter after loss: {name}")
             #print('finished cheking for inf and nans in parameters after loss')
             substep += 1
