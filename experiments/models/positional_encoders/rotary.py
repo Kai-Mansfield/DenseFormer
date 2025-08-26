@@ -18,30 +18,21 @@ from torch import nn
 from .encoder import PositionalEncoder, PositionalEncoderClosure
 from .rotary_utils import apply_rotary_emb
 
-def safe_move(x, device):
-    def move_tensor(t):
-        return t.detach().cpu().to(device).requires_grad_(t.requires_grad)
-
-    if isinstance(x, torch.Tensor):
-        return move_tensor(x)
-
-    elif isinstance(x, torch.nn.Module):
-        for param in x.parameters(recurse=True):
-            new_param = move_tensor(param)
-            param.data = new_param.data
-            param.requires_grad = new_param.requires_grad
-        for buffer_name, buffer in x._buffers.items():
-            if buffer is not None:
-                x._buffers[buffer_name] = buffer.detach().cpu().to(device)
+def safe_move(x, device, *, context="forward"):
+    if isinstance(x, torch.nn.Module):
+        return x.to(device)
+    elif isinstance(x, torch.Tensor):
+        if context == "forward":
+            # preserve graph
+            return x.to(device, non_blocking=True)
+        else:
+            # init/checkpoint contexts; no need to detach here either
+            return x.to(device)
+    elif hasattr(x, "encoder"):  # your closure case
+        x.encoder = safe_move(x.encoder, device, context=context)
         return x
-
-    elif hasattr(x, "__dict__") and hasattr(x, "encoder"):
-        # Move encoder inside closure
-        x.encoder = safe_move(x.encoder, device)
-        return x
-
     else:
-        raise TypeError(f"safe_move expects nn.Module or Tensor, got {type(x)}")
+        return x
 
 class RotaryPositionalEncoderClosure(PositionalEncoderClosure):
 

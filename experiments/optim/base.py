@@ -24,18 +24,21 @@ import sys
 
 from .utils import eval, get_batch, save_checkpoint
 
-def safe_move(x, device):
-    if isinstance(x, torch.Tensor):
-        if x.requires_grad and x.device != device:
-            return x.detach().cpu().to(device).requires_grad_(x.requires_grad)
-        else:
-            return x.to(device)
-    # If x is a module (nn.Module), just call .to(device)
-    elif isinstance(x, torch.nn.Module) or hasattr(x, 'to'):
+def safe_move(x, device, *, context="forward"):
+    if isinstance(x, torch.nn.Module):
         return x.to(device)
+    elif isinstance(x, torch.Tensor):
+        if context == "forward":
+            # preserve graph
+            return x.to(device, non_blocking=True)
+        else:
+            # init/checkpoint contexts; no need to detach here either
+            return x.to(device)
+    elif hasattr(x, "encoder"):  # your closure case
+        x.encoder = safe_move(x.encoder, device, context=context)
+        return x
     else:
-        # fallback, e.g. for other types, just return as is or raise error
-        raise TypeError(f"safe_move expects nn.Module or Tensor, got {type(x)}")
+        return x
 
 def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, sequence_length, eval_freq, ckpt_path, distributed_backend, extra_args, srt_iter=0):
     device_type = 'cuda' if 'cuda' in str(extra_args.device) else 'cpu'

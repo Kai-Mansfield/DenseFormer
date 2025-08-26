@@ -31,38 +31,21 @@ from torch.nn import functional as F
 
 from . import positional_encoders, caches
 
-def safe_move(x, device):
-    def move_tensor(t):
-        return t.detach().to(device).requires_grad_(t.requires_grad)
-
-    if isinstance(x, torch.Tensor):
-        return move_tensor(x)
-
-    elif isinstance(x, torch.nn.Module):
-        # Move parameters directly in this module
-        for name, param in list(x._parameters.items()):
-            if param is not None:
-                new_param = move_tensor(param)
-                x._parameters[name] = nn.Parameter(new_param, requires_grad=param.requires_grad)
-
-        # Move buffers
-        for buffer_name, buffer in x._buffers.items():
-            if buffer is not None:
-                x._buffers[buffer_name] = buffer.detach().to(device)
-
-        # Recurse into children
-        for child_name, child in x._modules.items():
-            if child is not None:
-                x._modules[child_name] = safe_move(child, device)
-
+def safe_move(x, device, *, context="forward"):
+    if isinstance(x, torch.nn.Module):
+        return x.to(device)
+    elif isinstance(x, torch.Tensor):
+        if context == "forward":
+            # preserve graph
+            return x.to(device, non_blocking=True)
+        else:
+            # init/checkpoint contexts; no need to detach here either
+            return x.to(device)
+    elif hasattr(x, "encoder"):  # your closure case
+        x.encoder = safe_move(x.encoder, device, context=context)
         return x
-
-    elif hasattr(x, "__dict__") and hasattr(x, "encoder"):
-        x.encoder = safe_move(x.encoder, device)
-        return x
-
     else:
-        raise TypeError(f"safe_move expects nn.Module or Tensor, got {type(x)}")
+        return x
 
 class LayerNorm(nn.Module):
     """ LayerNorm but with an optional bias. PyTorch doesn't support simply bias=False """
@@ -253,7 +236,6 @@ class GPTBase(nn.Module):
 
         # self.transformer.wte = self.transformer.wte.to("cuda:1")
         # self.lm_head = self.lm_head.to("cuda:1")
-        self.transformer.wte.weight = self.lm_head.weight
 
         # # Now move to GPUs selectively
         # wte_before = self.transformer["wte"].weight.data.cpu().clone()
@@ -439,6 +421,8 @@ class GPTBase(nn.Module):
         # print('lm_head_after.device', self.lm_head.weight.device)
         # diff = torch.abs(lm_head_before - lm_head_after).max().item()
         # print("Max difference between lm_head pre and post transfer weights:", diff, '\n')
+
+        self.transformer.wte.weight = self.lm_head.weight
 
         # Initialize all weights
         self.apply(self._init_weights)
