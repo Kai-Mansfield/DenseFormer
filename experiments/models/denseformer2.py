@@ -309,6 +309,7 @@ class DenseFormer2(nn.Module):
             x_splits = torch.split(x_stack, split_sizes, dim=-1)
 
             w = self.weights[rep_idx - 1].weight.view(-1)
+            print('w:', w.shape)
             n = w.numel() // self.es
             assert w.numel() == self.es * n, f"Expected {self.es * n} weights, got {w.numel()}"
 
