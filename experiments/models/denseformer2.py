@@ -311,6 +311,7 @@ class DenseFormer2(nn.Module):
             w = self.weights[rep_idx - 1].weight.view(-1)
             print('w:', w.shape)
             n = w.numel() // self.es
+            print('n:', n)
             assert w.numel() == self.es * n, f"Expected {self.es * n} weights, got {w.numel()}"
 
             # Apply weights to each split
