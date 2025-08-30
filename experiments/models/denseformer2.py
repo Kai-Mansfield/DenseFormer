@@ -320,11 +320,16 @@ class DenseFormer2(nn.Module):
             x_proj = []
             for i in range(self.es):
                 w_i = w[i * n : (i + 1) * n]
+                print('w_i:', w_i.shape)
                 x_i = x_splits[i]
+                print('x_i:', x_i.shape)
                 x_proj_i = torch.tensordot(w_i, x_i, dims=1)  
+                print('x_proj_i:', x_proj_i.shape)
                 x_proj.append(x_proj_i)
             # Concatenate along the last dimension
+            print('x_proj num:', len(x_proj))
             x = torch.cat(x_proj, dim=-1)
+            print('x after concat:', x.shape)
             del x_proj, x_splits, split_sizes, x_stack, C, n, w
 
         x = self.transformer.ln_f(x)
