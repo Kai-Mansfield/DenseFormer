@@ -210,6 +210,12 @@ class DenseFormer2(nn.Module):
             ln_f = LayerNorm(config.n_embd, bias=config.bias),
         ))
 
+        for i, inner_list in enumerate(self.transformer["h"]):
+            for j, block in enumerate(inner_list):
+                print(f"\n--- h[{i}][{j}] ---")
+                for name, module in block.named_modules():
+                    print(f"{name}: {module}")
+
         self.weights = nn.ModuleList([
             nn.Linear(self.es * (i + 2 + self.dilation_factor - 1) // self.dilation_factor, 1, bias=False) 
             for i in range(self.n_repeat)
