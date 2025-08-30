@@ -232,14 +232,15 @@ class DenseFormer2(nn.Module):
             module.weight.data.zero_()
             w = module.weight.view(-1)
             total = w.numel()
-            print('total:', total)
+            # print('total:', total)
             assert total % self.es == 0, f"Expected weight length divisible by n_splits={self.es}, got {total}"
             n = total // self.es
 
             for i in range(self.es):
                 idx = (i + 1) * n - 1  
                 module.weight.data[0, idx] = 1.
-                print("module.weight.data.shape:", module.weight.data.shape)
+            
+            # print("module.weight.data.shape:", module.weight.data.shape)
 
         # report number of parameters
         print("number of parameters: %.2fM" % (self.get_num_params()/1e6,))
