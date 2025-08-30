@@ -314,7 +314,7 @@ class DenseFormer2(nn.Module):
             print('n:', n)
             assert w.numel() == self.es * n, f"Expected {self.es * n} weights, got {w.numel()}"
 
-            print('x_splits num:', x_splits.shape)
+            print('x_splits num:', x_splits.size)
             print('x_splits shapes:', [x_i.shape for x_i in x_splits])
             # Apply weights to each split
             x_proj = []
