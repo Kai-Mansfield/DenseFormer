@@ -232,6 +232,7 @@ class DenseFormer2(nn.Module):
             module.weight.data.zero_()
             w = module.weight.view(-1)
             total = w.numel()
+            print('total:', total)
             assert total % self.es == 0, f"Expected weight length divisible by n_splits={self.es}, got {total}"
             n = total // self.es
 
