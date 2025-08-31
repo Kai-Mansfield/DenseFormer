@@ -216,6 +216,7 @@ class DenseFormer2(nn.Module):
         ])
 
         print(self.transformer["h"][0])
+        print(self.transformer["h"])
 
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
         # with weight tying when using torch.compile() some warnings get generated:
