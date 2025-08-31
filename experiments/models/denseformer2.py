@@ -210,6 +210,8 @@ class DenseFormer2(nn.Module):
             ln_f = LayerNorm(config.n_embd, bias=config.bias),
         ))
 
+        print(self.transformer["h"])
+
         self.weights = nn.ModuleList([
             nn.Linear(self.es * (i + 2 + self.dilation_factor - 1) // self.dilation_factor, 1, bias=False) 
             for i in range(self.n_repeat)
@@ -292,7 +294,6 @@ class DenseFormer2(nn.Module):
             x_accs.append((torch.zeros((current_group_size, *x.shape), device=x.device, dtype=x.dtype), None))
         x_accs[0] = apply_inplace_set(x_accs[0], 0, x)
         for rep_idx in range(1, self.n_repeat+1):
-            print('rep_idx % self.dilation_factor', rep_idx % self.dilation_factor)
             for block in self.transformer.h[rep_idx-1]:
                 x = block(x, pos_emb_closure, cache_context, start_index=index_shift)
             x_accs[rep_idx % self.dilation_factor] = apply_inplace_set(
