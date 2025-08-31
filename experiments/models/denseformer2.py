@@ -215,6 +215,8 @@ class DenseFormer2(nn.Module):
             for i in range(self.n_repeat)
         ])
 
+        print(self.transformer["h"][0])
+
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
         # with weight tying when using torch.compile() some warnings get generated:
         # "UserWarning: functional_call was passed multiple values for tied weights.
