@@ -294,8 +294,8 @@ class DenseFormer2(nn.Module):
         print('x_accs shapes:', [xa[0].shape for xa in x_accs])
         x_accs[0] = apply_inplace_set(x_accs[0], 0, x)
         print('x_accs shapes:', [xa[0].shape for xa in x_accs])
-        print('rep_idx % self.dilation_factor', rep_idx % self.dilation_factor)
         for rep_idx in range(1, self.n_repeat+1):
+            print('rep_idx % self.dilation_factor', rep_idx % self.dilation_factor)
             for block in self.transformer.h[rep_idx-1]:
                 x = block(x, pos_emb_closure, cache_context, start_index=index_shift)
             x_accs[rep_idx % self.dilation_factor] = apply_inplace_set(
