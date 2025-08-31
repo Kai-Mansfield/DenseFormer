@@ -303,7 +303,7 @@ class DenseFormer2(nn.Module):
                 x,
                 
             )
-            print(len(x_accs[rep_idx % self.dilation_factor]))
+            print('x_accs[rep_idx % self.dilation_factor][0].shape:', x_accs[rep_idx % self.dilation_factor][0].shape)
             x_stack = x_accs[rep_idx % self.dilation_factor][1]  
             print('x_stack:', x_stack.shape if x_stack is not None else None)
             if x_stack is None:
