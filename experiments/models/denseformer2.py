@@ -293,6 +293,7 @@ class DenseFormer2(nn.Module):
             if i < (self.n_repeat + 1) % self.dilation_factor:
                 current_group_size += 1
             x_accs.append((torch.zeros((current_group_size, *x.shape), device=x.device, dtype=x.dtype), None))
+        print('len(x_accs):', len(x_accs))
         x_accs[0] = apply_inplace_set(x_accs[0], 0, x)
         for rep_idx in range(1, self.n_repeat+1):
             for block in self.transformer.h[rep_idx-1]:
