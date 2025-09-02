@@ -301,7 +301,6 @@ class DenseFormer2(nn.Module):
                 
             )
             x_stack = x_accs[rep_idx % self.dilation_factor][1]  
-            print('x_stack:', x_stack.shape if x_stack is not None else None)
             if x_stack is None:
                 raise RuntimeError(f"x_stack is None at rep_idx={rep_idx}")
 
@@ -313,27 +312,18 @@ class DenseFormer2(nn.Module):
             x_splits = torch.split(x_stack, split_sizes, dim=-1)
 
             w = self.weights[rep_idx - 1].weight.view(-1)
-            print('w:', w.shape)
             n = w.numel() // self.es
-            print('n:', n)
             assert w.numel() == self.es * n, f"Expected {self.es * n} weights, got {w.numel()}"
 
-            print('x_splits num:', len(x_splits))
-            print('x_splits shapes:', [x_i.shape for x_i in x_splits])
             # Apply weights to each split
             x_proj = []
             for i in range(self.es):
                 w_i = w[i * n : (i + 1) * n]
-                print('w_i:', w_i.shape)
                 x_i = x_splits[i]
-                print('x_i:', x_i.shape)
-                x_proj_i = torch.tensordot(w_i, x_i, dims=1)  
-                print('x_proj_i:', x_proj_i.shape)
+                x_proj_i = torch.tensordot(w_i, x_i, dims=1) 
                 x_proj.append(x_proj_i)
             # Concatenate along the last dimension
-            print('x_proj num:', len(x_proj))
             x = torch.cat(x_proj, dim=-1)
-            print('x after concat:', x.shape)
             del x_proj, x_splits, split_sizes, x_stack, C, n, w
 
         x = self.transformer.ln_f(x)
