@@ -236,7 +236,7 @@ class GPTBase(nn.Module):
 
         self.transformer["wte"]  = safe_move(self.transformer["wte"], "cuda:0")
         self.transformer["wpe"] = safe_move(self.transformer["wpe"], "cuda:0")
-        self.transformer["drop"] = safe_move(self.transformer["drop"], "cuda:0")
+        self.transformer["drop"] = safe_move(self.transformer["drop"], "cuda:1")
         for i, block in enumerate(self.transformer["h"]):
             self.transformer["h"][i] = safe_move(block, "cuda:1")
             # if i < mid:
@@ -298,6 +298,9 @@ class GPTBase(nn.Module):
         x = pos_emb_closure.adapt_model_input(tok_emb, start_index=index_shift)
         if torch.isnan(x).any():
             print(f"NaNs found after pos_emb_closure.adapt_model_input(tok_emb, start_index=index_shift)")
+
+        x = safe_move(x, "cuda:1")
+
         x = self.transformer.drop(x)
         if torch.isnan(x).any():
             print(f"NaNs found after self.transformer.drop(x)")
@@ -312,8 +315,6 @@ class GPTBase(nn.Module):
         #     # Check output after block (optional)
         #     if torch.isnan(x).any():
         #         print(f"NaNs found in output of block {i}")
-
-        x = safe_move(x, "cuda:1")
 
         pos_emb_closure = safe_move(pos_emb_closure, "cuda:1")
 
