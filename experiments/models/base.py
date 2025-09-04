@@ -234,7 +234,7 @@ class GPTBase(nn.Module):
 
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
 
-        self.transformer["wte"]  = safe_move(self.transformer["wte"], "cuda:0")
+        self.transformer["wte"]  = safe_move(self.transformer["wte"], "cuda:1")
         self.transformer["wpe"] = safe_move(self.transformer["wpe"], "cuda:0")
         self.transformer["drop"] = safe_move(self.transformer["drop"], "cuda:1")
         for i, block in enumerate(self.transformer["h"]):
@@ -244,7 +244,7 @@ class GPTBase(nn.Module):
             # else:
             #     self.transformer["h"][i] = safe_move(block, "cuda:1")
         self.transformer["ln_f"] = safe_move(self.transformer["ln_f"], "cuda:1")
-        self.lm_head = safe_move(self.lm_head, "cuda:0")
+        self.lm_head = safe_move(self.lm_head, "cuda:1")
 
         self.transformer.wte.weight = self.lm_head.weight
 
@@ -294,12 +294,13 @@ class GPTBase(nn.Module):
         else:
             idx, pos_emb_closure = self.transformer.wpe(idx)
 
+        idx = safe_move(idx, "cuda:1")
+        pos_emb_closure = safe_move(pos_emb_closure, "cuda:1")
+
         tok_emb = self.transformer.wte(idx)
         x = pos_emb_closure.adapt_model_input(tok_emb, start_index=index_shift)
         if torch.isnan(x).any():
             print(f"NaNs found after pos_emb_closure.adapt_model_input(tok_emb, start_index=index_shift)")
-
-        x = safe_move(x, "cuda:1")
 
         x = self.transformer.drop(x)
         if torch.isnan(x).any():
@@ -316,8 +317,6 @@ class GPTBase(nn.Module):
         #     if torch.isnan(x).any():
         #         print(f"NaNs found in output of block {i}")
 
-        pos_emb_closure = safe_move(pos_emb_closure, "cuda:1")
-
         for i in range(0, self.config.n_layer):
             x = self.transformer.h[i](x, pos_emb_closure, cache_context, start_index=index_shift)
         if torch.isnan(x).any():
@@ -333,7 +332,7 @@ class GPTBase(nn.Module):
             print(f"NaNs found after self.lm_cache.get_final_logits(x)")
 
         if targets is not None:
-            x = safe_move(x, "cuda:0")
+            #x = safe_move(x, "cuda:0")
             logits = self.lm_head(x)
             loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
         else:
