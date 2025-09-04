@@ -64,11 +64,6 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
                 
         for microstep_idx in range(acc_steps):  # gradient accumulation
             x, y = get_batch(data['train'], sequence_length, batch_size, device=extra_args.device)
-
-            # print("Target min/max:", y.cpu().min().item(), y.cpu().max().item())
-            # print("Unique target values:", torch.unique(y.cpu()))
-            # print('vocab size:', model.config.vocab_size)
-
             if torch.any(y.cpu() >= 50304) or torch.any(y.cpu() < -1):
                 print("Found out-of-range targets!")
             if torch.any(y.cpu() >= model.config.vocab_size):
@@ -78,21 +73,11 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
                     if getattr(model, "needs_iter", False):
                         outputs = model(x, targets=y, iter=itr)
                     else:
-                        # x = x.to('cuda:1')
-                        # y = y.to('cuda:1')
-                        # model = model.to('cuda:1')
-                        # print('x device:', x.device)
-                        # print('y device:', y.device)
-                        # print('model params device:', next(model.parameters()).device)
                         if torch.isnan(x).any():
                             print("Input x contains NaNs!")
-                        # else:
-                        #     print("Input x has no NaNs.")
 
                         if torch.isnan(y).any():
                             print("Target y contains NaNs!")
-                        # else:
-                        #     print("Target y has no NaNs.")
                         outputs = model(x, targets=y)
 
             loss = outputs['loss']
@@ -101,22 +86,12 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
                     print(f"NaN detected in parameter be4 loss: {name}")
                 if torch.isinf(p).any():
                     print(f"Inf detected in parameter be4 loss: {name}")
-            # print('finished cheking for inf and nans in parameters be4 loss')
             loss.backward()
-            total, updated = 0, 0
             for i, (name, p) in enumerate(model.named_parameters()):
                 if torch.isnan(p).any():
                     print(f"NaN detected in parameter after loss: {name}")
                 if torch.isinf(p).any():
                     print(f"Inf detected in parameter after loss: {name}")
-            #     if p.requires_grad:
-            #         total += 1
-            #         has_grad = (p.grad is not None) and torch.isfinite(p.grad).all() and (p.grad.abs().sum() > 0)
-            #         updated += int(has_grad)
-            #         if not has_grad:
-            #             print("NO GRAD:", name, p.device, p.shape)
-            # print(f"grad-bearing params with nonzero grads: {updated}/{total}")
-            #print('finished cheking for inf and nans in parameters after loss')
             substep += 1
 
         if extra_args.grad_clip != 0.0:
