@@ -333,8 +333,7 @@ class GPTBase(nn.Module):
 
         if targets is not None:
             logits = self.lm_head(x)
-            x = safe_move(x, "cuda:0")
-            print('targets device:', targets.device)
+            logits = safe_move(logits, "cuda:0")
             loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
         else:
             logits = self.lm_head(x[:, [-1], :])
