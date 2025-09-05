@@ -41,6 +41,7 @@ class RotaryPositionalEncoderClosure(PositionalEncoderClosure):
         if T == 0:
             return v
         other_dims_prefix = other_dims[:len(other_dims) - len(indices.shape) + 1]
+        print('self.encoder.freqs device:', self.encoder.freqs.device)
         print('indices device:', indices.device)
         freqs = (indices.unsqueeze(-1) * safe_move(self.encoder.freqs, indices.device).view(1, -1)).unsqueeze(-1).expand(*indices.shape, -1, 2).reshape(*indices.shape, hs)
         freqs = freqs.view([1] * len(other_dims_prefix) + list(indices.shape) + [hs]).expand(*v.shape)
