@@ -134,21 +134,21 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
                 t0 = time.time()
         if True:
             if extra_args.save_checkpoint_freq is not None and itr % extra_args.save_checkpoint_freq == 0:
-                print(f"saving checkpoint to {ckpt_path}/ckpt.pt")
+                print(f"saving checkpoint to {ckpt_path}/{extra_args.ckpt_name}")
                 save_checkpoint(distributed_backend=distributed_backend,
                                 model=model,
                                 opt=opt,
                                 scheduler=scheduler,
                                 itr=itr,
-                                ckpt_path=f"{ckpt_path}/ckpt.pt")
+                                ckpt_path=f"{ckpt_path}/{extra_args.ckpt_name}")
 
     if True:
-        print(f"saving checkpoint to {ckpt_path}")
+        print(f"saving checkpoint to {ckpt_path}/{extra_args.ckpt_name}")
         torch.save({
             'model': model.state_dict(),
             'opt': opt.state_dict(),
             'scheduler': scheduler.state_dict() if scheduler else None,
             'itr': itr
-        }, f"{ckpt_path}/ckpt.pt")
+        }, f"{ckpt_path}/{extra_args.ckpt_name}")
 
     return stats
