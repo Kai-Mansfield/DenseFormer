@@ -24,6 +24,22 @@ from torch.nn import functional as F
 
 from . import positional_encoders, caches
 
+def safe_move(x, device, *, context="forward"):
+    if isinstance(x, torch.nn.Module):
+        return x.to(device)
+    elif isinstance(x, torch.Tensor):
+        if context == "forward":
+            # preserve graph
+            return x.to(device, non_blocking=True)
+        else:
+            # init/checkpoint contexts; no need to detach here either
+            return x.to(device)
+    elif hasattr(x, "encoder"):  # your closure case
+        x.encoder = safe_move(x.encoder, device, context=context)
+        return x
+    else:
+        return x
+
 class InPlaceSetSlice(torch.autograd.Function):
 
     @staticmethod
@@ -210,10 +226,21 @@ class DenseFormer2(nn.Module):
         ])
 
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
-        # with weight tying when using torch.compile() some warnings get generated:
-        # "UserWarning: functional_call was passed multiple values for tied weights.
-        # This behavior is deprecated and will be an error in future versions"
-        # not 100% sure what this is, so far seems to be harmless. TODO investigate
+
+        self.transformer["wte"]  = safe_move(self.transformer["wte"], "cuda:1")
+        self.transformer["wpe"] = safe_move(self.transformer["wpe"], "cuda:0")
+        self.transformer["drop"] = safe_move(self.transformer["drop"], "cuda:1")
+        for i, block in enumerate(self.transformer["h"]):
+            self.transformer["h"][i] = safe_move(block, "cuda:1")
+            # if i < mid:
+            #     self.transformer["h"][i] = safe_move(block, "cuda:0")
+            # else:
+            #     self.transformer["h"][i] = safe_move(block, "cuda:1")
+        self.transformer["ln_f"] = safe_move(self.transformer["ln_f"], "cuda:1")
+        for i, weight in enumerate(self.weights):
+            self.weights[i] = safe_move(weight, "cuda:1")
+        self.lm_head = safe_move(self.lm_head, "cuda:1")
+
         self.transformer.wte.weight = self.lm_head.weight # https://paperswithcode.com/method/weight-tying
 
         # init all weights
@@ -265,6 +292,10 @@ class DenseFormer2(nn.Module):
             idx, pos_emb_closure = self.transformer.wpe(idx, iter=iter) # position embeddings of shape (1, t, n_embd)
         else:
             idx, pos_emb_closure = self.transformer.wpe(idx) # position embeddings of shape (1, t, n_embd)
+
+        idx = safe_move(idx, "cuda:1")
+        pos_emb_closure = safe_move(pos_emb_closure, "cuda:1")
+
         tok_emb = self.transformer.wte(idx) # token embeddings of shape (b, t, n_embd)
         x = pos_emb_closure.adapt_model_input(tok_emb, start_index=index_shift)
         x = self.transformer.drop(x)
@@ -306,6 +337,7 @@ class DenseFormer2(nn.Module):
             x = self.lm_cache.get_final_logits(x)
         if targets is not None:
             logits = self.lm_head(x)
+            logits = safe_move(logits, "cuda:0")
             loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
         else:
             # inference-time mini-optimization: only forward the lm_head on the very last position
