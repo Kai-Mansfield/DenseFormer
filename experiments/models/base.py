@@ -223,7 +223,7 @@ class GPTBase(nn.Module):
             drop = nn.Dropout(config.dropout),
 
             h = nn.ModuleList([
-                Block(config, self.lm_cache) for _ in range(num_layers)
+                Block(config, self.lm_cache) for _ in range(config.n_layer)
             ]),
 
             ln_f = LayerNorm(config.n_embd, bias=config.bias),
