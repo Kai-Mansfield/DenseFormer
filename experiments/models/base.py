@@ -215,9 +215,6 @@ class GPTBase(nn.Module):
 
         self.lm_cache = caches.get_cache(config.lm_cache)(config)
 
-        num_layers = config.n_layer
-        mid = num_layers // 2  # Split point for model parallelism
-
         # === Split model components across cuda:0 and cuda:1 ===
         self.transformer = nn.ModuleDict(dict(
             # Start everything on CPU
@@ -237,12 +234,25 @@ class GPTBase(nn.Module):
         self.transformer["wte"]  = safe_move(self.transformer["wte"], "cuda:1")
         self.transformer["wpe"] = safe_move(self.transformer["wpe"], "cuda:0")
         self.transformer["drop"] = safe_move(self.transformer["drop"], "cuda:1")
+        
+        n_layer = config.n_layer
+
+        if n_layer <= 12:
+            # All go to cuda:1
+            n_cuda0 = 0
+        else:
+            # First 12 fixed on cuda:1
+            remaining = n_layer - 12
+            self.n_cuda0 = (remaining + 1) // 2  
+
+        # Now move layers
         for i, block in enumerate(self.transformer["h"]):
-            self.transformer["h"][i] = safe_move(block, "cuda:1")
-            # if i < mid:
-            #     self.transformer["h"][i] = safe_move(block, "cuda:0")
-            # else:
-            #     self.transformer["h"][i] = safe_move(block, "cuda:1")
+            if i < self.n_cuda0:
+                dev = "cuda:0"
+            else:
+                dev = "cuda:1"
+            self.transformer["h"][i] = safe_move(block, dev)
+
         self.transformer["ln_f"] = safe_move(self.transformer["ln_f"], "cuda:1")
         self.lm_head = safe_move(self.lm_head, "cuda:1")
 
@@ -306,21 +316,16 @@ class GPTBase(nn.Module):
         if torch.isnan(x).any():
             print(f"NaNs found after self.transformer.drop(x)")
 
-        # mid = self.config.n_layer // 2
-        # for i in range(mid):
-        #     if cache_context is not None and torch.isnan(cache_context).any():
-        #         print(f"NaNs found in input cache_context before block {i}")
-
-        #     x = self.transformer.h[i](x, pos_emb_closure, cache_context, start_index=index_shift)
-
-        #     # Check output after block (optional)
-        #     if torch.isnan(x).any():
-        #         print(f"NaNs found in output of block {i}")
-
-        for i in range(0, self.config.n_layer):
-            x = self.transformer.h[i](x, pos_emb_closure, cache_context, start_index=index_shift)
-        if torch.isnan(x).any():
-            print('nans found after second half of transformer blocks')
+        if self.n_cuda0 > 0:
+            x = safe_move(x, "cuda:0")
+            for i in range(0, self.n_cuda0):
+                x = self.transformer.h[i](x, pos_emb_closure, cache_context, start_index=index_shift)
+            x = safe_move(x, "cuda:1")
+            for i in range(self.n_cuda0, self.config.n_layer):
+                x = self.transformer.h[i](x, pos_emb_closure, cache_context, start_index=index_shift)
+        else:
+            for i in range(0, self.config.n_layer):
+                x = self.transformer.h[i](x, pos_emb_closure, cache_context, start_index=index_shift)
 
         x = self.transformer.ln_f(x)
         if torch.isnan(x).any():
