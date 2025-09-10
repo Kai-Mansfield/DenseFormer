@@ -239,7 +239,7 @@ class GPTBase(nn.Module):
 
         if n_layer <= 12:
             # All go to cuda:1
-            n_cuda0 = 0
+            self.n_cuda0 = 0
         else:
             # First 12 fixed on cuda:1
             remaining = n_layer - 12
