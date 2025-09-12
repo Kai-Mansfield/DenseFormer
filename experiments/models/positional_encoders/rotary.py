@@ -18,22 +18,6 @@ from torch import nn
 from .encoder import PositionalEncoder, PositionalEncoderClosure
 from .rotary_utils import apply_rotary_emb
 
-def safe_move(x, device, *, context="forward"):
-    if isinstance(x, torch.nn.Module):
-        return x.to(device)
-    elif isinstance(x, torch.Tensor):
-        if context == "forward":
-            # preserve graph
-            return x.to(device, non_blocking=True)
-        else:
-            # init/checkpoint contexts; no need to detach here either
-            return x.to(device)
-    elif hasattr(x, "encoder"):  # your closure case
-        x.encoder = safe_move(x.encoder, device, context=context)
-        return x
-    else:
-        return x
-
 class RotaryPositionalEncoderClosure(PositionalEncoderClosure):
 
     def adapt_vector_for_indices(self, v, indices):
@@ -41,9 +25,7 @@ class RotaryPositionalEncoderClosure(PositionalEncoderClosure):
         if T == 0:
             return v
         other_dims_prefix = other_dims[:len(other_dims) - len(indices.shape) + 1]
-        print('self.encoder.freqs:', self.encoder.freqs.device)
-        print('indices:', indices.device)
-        freqs = (indices.unsqueeze(-1) * safe_move(self.encoder.freqs, indices.device).view(1, -1)).unsqueeze(-1).expand(*indices.shape, -1, 2).reshape(*indices.shape, hs)
+        freqs = (indices.unsqueeze(-1) * self.encoder.freqs.view(1, -1)).unsqueeze(-1).expand(*indices.shape, -1, 2).reshape(*indices.shape, hs)
         freqs = freqs.view([1] * len(other_dims_prefix) + list(indices.shape) + [hs]).expand(*v.shape)
         v = apply_rotary_emb(freqs, v)
         return v

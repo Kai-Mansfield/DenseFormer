@@ -24,22 +24,6 @@ import sys
 
 from .utils import eval, get_batch, save_checkpoint
 
-def safe_move(x, device, *, context="forward"):
-    if isinstance(x, torch.nn.Module):
-        return x.to(device)
-    elif isinstance(x, torch.Tensor):
-        if context == "forward":
-            # preserve graph
-            return x.to(device, non_blocking=True)
-        else:
-            # init/checkpoint contexts; no need to detach here either
-            return x.to(device)
-    elif hasattr(x, "encoder"):  # your closure case
-        x.encoder = safe_move(x.encoder, device, context=context)
-        return x
-    else:
-        return x
-
 def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, sequence_length, eval_freq, ckpt_path, distributed_backend, extra_args, srt_iter=0):
     device_type = 'cuda' if 'cuda' in str(extra_args.device) else 'cpu'
     type_ctx = nullcontext() if device_type == 'cpu' else torch.amp.autocast(
