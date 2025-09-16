@@ -242,8 +242,9 @@ class GPTBase(nn.Module):
             self.n_cuda0 = 0
         else:
             # First 12 fixed on cuda:1
-            remaining = n_layer - 22
+            remaining = min(n_layer, 75) - 22
             self.n_cuda0 = (remaining + 1) // 2  
+            self.n_cuda0 += min(0, n_layer - 75) 
 
         # Now move layers
         for i, block in enumerate(self.transformer["h"]):
