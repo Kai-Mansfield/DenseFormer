@@ -237,12 +237,12 @@ class GPTBase(nn.Module):
         
         n_layer = config.n_layer
 
-        if n_layer <= 22:
+        if n_layer <= 23:
             # All go to cuda:1
             self.n_cuda0 = 0
         else:
             # First 12 fixed on cuda:1
-            remaining = n_layer - 22
+            remaining = n_layer - 23
             self.n_cuda0 = (remaining + 1) // 2  
 
         # Now move layers
