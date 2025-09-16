@@ -289,6 +289,7 @@ class GPTBase(nn.Module):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
     def forward(self, idx, targets=None, get_logits=False, use_cache=False, iter=None):
+        print('idx.device', idx.device)
         b, t = idx.size()
         assert t <= self.config.sequence_length, f"Cannot forward sequence of length {t}, block size is only {self.config.sequence_length}"
 
