@@ -329,9 +329,6 @@ class DenseFormer2(nn.Module):
                     g.to("cuda:1", non_blocking=True) if isinstance(g, torch.Tensor) else g)
                     for (t, g) in x_accs
                 ]
-                print('x_accs', x_accs)
-            print('x.device', x.device)
-            print('x_accs.device', [acc[0].device for acc in x_accs])
             for block in self.transformer.h[rep_idx-1]:
                 x = block(x, pos_emb_closure, cache_context, start_index=index_shift)
             x_accs[rep_idx % self.dilation_factor] = apply_inplace_set(
@@ -341,7 +338,6 @@ class DenseFormer2(nn.Module):
                 
             )
             x_stack = x_accs[rep_idx % self.dilation_factor][1] 
-            print('x_stack.dev', x_stack.device) 
             if x_stack is None:
                 raise RuntimeError(f"x_stack is None at rep_idx={rep_idx}")
             C = x_stack.shape[-1]
