@@ -316,7 +316,7 @@ class DenseFormer2(nn.Module):
                 
             )
             x_stack = x_accs[rep_idx % self.dilation_factor][1] 
-            print('x_stack.shape', x_stack.shape) 
+            print('x_stack.dev', x_stack.device) 
             if x_stack is None:
                 raise RuntimeError(f"x_stack is None at rep_idx={rep_idx}")
             C = x_stack.shape[-1]
