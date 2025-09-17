@@ -325,6 +325,8 @@ class DenseFormer2(nn.Module):
             if rep_idx == 1 + self.n_cuda0:
                 x = safe_move(x, "cuda:1")
                 x_accs = safe_move(x_accs, "cuda:1")
+            print('x.device', x.device)
+            print('x_accs.device', x_accs.device)
             for block in self.transformer.h[rep_idx-1]:
                 x = block(x, pos_emb_closure, cache_context, start_index=index_shift)
             x_accs[rep_idx % self.dilation_factor] = apply_inplace_set(
