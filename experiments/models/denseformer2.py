@@ -324,8 +324,8 @@ class DenseFormer2(nn.Module):
         for rep_idx in range(1, self.n_repeat+1):
             if rep_idx == 1 + self.n_cuda0:
                 x = safe_move(x, "cuda:1")
-                print('x_accs[0][0]', x_accs[0][0])
-                x_accs = [(safe_move(acc[0], "cuda:1")) for acc in x_accs]
+                x_accs = [safe_move(x, "cuda:1") if isinstance(x, torch.Tensor) else x for x in x_accs]
+                print('x_accs', x_accs)
             print('x.device', x.device)
             print('x_accs.device', [acc[0].device for acc in x_accs])
             for block in self.transformer.h[rep_idx-1]:
