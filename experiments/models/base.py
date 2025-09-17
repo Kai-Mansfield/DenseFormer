@@ -314,10 +314,9 @@ class GPTBase(nn.Module):
         if torch.isnan(x).any():
             print(f"NaNs found after self.transformer.drop(x)")
 
-        for i in range(0, self.n_cuda0):
-            x = self.transformer.h[i](x, pos_emb_closure, cache_context, start_index=index_shift)
-        x = safe_move(x, "cuda:1")
-        for i in range(self.n_cuda0, self.config.n_layer):
+        for i in range(0, self.config.n_layer):
+            if i == self.n_cuda0:
+                x = safe_move(x, "cuda:1")
             x = self.transformer.h[i](x, pos_emb_closure, cache_context, start_index=index_shift)
 
         x = self.transformer.ln_f(x)
