@@ -321,10 +321,15 @@ class DenseFormer2(nn.Module):
                 current_group_size += 1
             x_accs.append((torch.zeros((current_group_size, *x.shape), device=x.device, dtype=x.dtype), None))
         x_accs[0] = apply_inplace_set(x_accs[0], 0, x)
-        print('x_accs', x_accs)
         for rep_idx in range(1, self.n_repeat+1):
             if rep_idx == 1 + self.n_cuda0:
                 x = safe_move(x, "cuda:1")
+                x_accs = [
+                    (t.to("cuda:1", non_blocking=True) if isinstance(t, torch.Tensor) else t,
+                    g.to("cuda:1", non_blocking=True) if isinstance(g, torch.Tensor) else g)
+                    for (t, g) in x_accs
+                ]
+                print('x_accs', x_accs)
             print('x.device', x.device)
             print('x_accs.device', [acc[0].device for acc in x_accs])
             for block in self.transformer.h[rep_idx-1]:
