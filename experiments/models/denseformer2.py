@@ -314,6 +314,8 @@ class DenseFormer2(nn.Module):
         if torch.isnan(x).any():
             print(f"NaNs found after self.transformer.drop(x)")
 
+        x = safe_move(x, "cuda:1")
+
         x_accs = []
         for i in range(self.dilation_factor):
             current_group_size = (self.n_repeat + 1) // self.dilation_factor
