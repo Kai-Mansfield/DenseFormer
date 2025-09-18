@@ -324,7 +324,7 @@ class DenseFormer2(nn.Module):
         for rep_idx in range(1, self.n_repeat+1):
             if rep_idx == 1 + self.n_cuda0:
                 x = safe_move(x, "cuda:1")
-                x_accs[rep_idx % self.dilation_factor] = (safe_move(x_accs[rep_idx % self.dilation_factor][0], 'cuda:1'), safe_move(x_accs[rep_idx % self.dilation_factor][1], 'cuda:1'))
+                x_accs[rep_idx % self.dilation_factor] = (x_accs[rep_idx % self.dilation_factor][0], safe_move(x_accs[rep_idx % self.dilation_factor][1], 'cuda:1'))
             for block in self.transformer.h[rep_idx-1]:
                 x = block(x, pos_emb_closure, cache_context, start_index=index_shift)
             full_tensor, new_slice = apply_inplace_set(
