@@ -334,6 +334,7 @@ class DenseFormer2(nn.Module):
                 
             )
             x_accs[rep_idx % self.dilation_factor] = (safe_move(full_tensor, "cuda:1"), safe_move(new_slice, "cuda:1"))
+            print('x_accs[0]', x_accs[0])
             print('full_tensor.device, new_slice.devic', safe_move(full_tensor, "cuda:1").device, safe_move(new_slice, "cuda:1").device)
             print('x_accs[rep_idx % self.dilation_factor][0].dev', x_accs[rep_idx % self.dilation_factor][0].device)
             print('x_accs[rep_idx % self.dilation_factor][1].dev', x_accs[rep_idx % self.dilation_factor][1].device)
