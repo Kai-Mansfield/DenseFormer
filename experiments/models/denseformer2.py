@@ -321,6 +321,7 @@ class DenseFormer2(nn.Module):
                 current_group_size += 1
             x_accs.append((torch.zeros((current_group_size, *x.shape), device=x.device, dtype=x.dtype), None))
         x_accs[0] = apply_inplace_set(x_accs[0], 0, x)
+        print('x_accs[0]', x_accs[0])
         for rep_idx in range(1, self.n_repeat+1):
             if rep_idx == 1 + self.n_cuda0:
                 x = safe_move(x, "cuda:1")
