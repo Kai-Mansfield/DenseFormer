@@ -324,6 +324,7 @@ class DenseFormer2(nn.Module):
         for rep_idx in range(1, self.n_repeat+1):
             if rep_idx == 1 + self.n_cuda0:
                 x = safe_move(x, "cuda:1")
+                x_accs[rep_idx % self.dilation_factor] = (safe_move(x_accs[rep_idx % self.dilation_factor][0], 'cuda:1'), safe_move(x_accs[rep_idx % self.dilation_factor][1], 'cuda:1'))
             for block in self.transformer.h[rep_idx-1]:
                 x = block(x, pos_emb_closure, cache_context, start_index=index_shift)
             full_tensor, new_slice = apply_inplace_set(
@@ -334,9 +335,10 @@ class DenseFormer2(nn.Module):
             )
             print('full_tensor.device', full_tensor.device)
             print('new_slice.device', new_slice.device)
-            full_tensor, new_slice = safe_move(full_tensor, "cuda:1"), safe_move(new_slice, "cuda:1")
-            x_accs[rep_idx % self.dilation_factor] = (full_tensor, new_slice)
+            # full_tensor, new_slice = safe_move(full_tensor, "cuda:1"), safe_move(new_slice, "cuda:1")
+            # x_accs[rep_idx % self.dilation_factor] = (full_tensor, new_slice)
             x_stack = x_accs[rep_idx % self.dilation_factor][1] 
+            print('x_stack.device', x_stack.device)
             if x_stack is None:
                 raise RuntimeError(f"x_stack is None at rep_idx={rep_idx}")
             C = x_stack.shape[-1]
