@@ -333,6 +333,7 @@ class DenseFormer2(nn.Module):
                 x,
                 
             )
+            print('x_accs.type', type(x_accs))
             # print('full_tensor.device', full_tensor.device)
             # print('new_slice.device', new_slice.device)
             # full_tensor, new_slice = safe_move(full_tensor, "cuda:1"), safe_move(new_slice, "cuda:1")
