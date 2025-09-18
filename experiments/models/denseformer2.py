@@ -356,7 +356,7 @@ class DenseFormer2(nn.Module):
             x_left = torch.tensordot(w[:n], x_left, dims=1)
             x_right = torch.tensordot(w[n:], x_right, dims=1)
             x = torch.cat([x_left, x_right], dim=-1) 
-            del x_left, x_right, split_sizes, x_stack, C, n, w, full_tensor, new_slice
+            del x_left, x_right, split_sizes, x_stack, C, n, w, #full_tensor, new_slice
 
         x = self.transformer.ln_f(x)
 
