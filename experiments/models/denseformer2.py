@@ -322,14 +322,9 @@ class DenseFormer2(nn.Module):
             x_accs.append((torch.zeros((current_group_size, *x.shape), device=x.device, dtype=x.dtype), None))
         x_accs[0] = apply_inplace_set(x_accs[0], 0, x)
         for rep_idx in range(1, self.n_repeat+1):
-            print('x_accs[0][1]', x_accs[0][1])
             if rep_idx == 1 + self.n_cuda0:
                 x = safe_move(x, "cuda:1")
-                x_accs = [
-                    (t.to("cuda:1", non_blocking=True) if isinstance(t, torch.Tensor) else t,
-                    g.to("cuda:1", non_blocking=True) if isinstance(g, torch.Tensor) else g)
-                    for (t, g) in x_accs
-                ]
+                x_accs[rep_idx % self.dilation_factor][1] = safe_move(x_accs[rep_idx % self.dilation_factor][1], "cuda:1")
             for block in self.transformer.h[rep_idx-1]:
                 x = block(x, pos_emb_closure, cache_context, start_index=index_shift)
             x_accs[rep_idx % self.dilation_factor] = apply_inplace_set(
@@ -339,6 +334,7 @@ class DenseFormer2(nn.Module):
                 
             )
             x_stack = x_accs[rep_idx % self.dilation_factor][1] 
+            print('x_stack.device', x_stack.device)
             if x_stack is None:
                 raise RuntimeError(f"x_stack is None at rep_idx={rep_idx}")
             C = x_stack.shape[-1]
