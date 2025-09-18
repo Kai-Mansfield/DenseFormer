@@ -333,12 +333,12 @@ class DenseFormer2(nn.Module):
                 x,
                 
             )
-            print('full_tensor.device', full_tensor.device)
-            print('new_slice.device', new_slice.device)
+            # print('full_tensor.device', full_tensor.device)
+            # print('new_slice.device', new_slice.device)
             # full_tensor, new_slice = safe_move(full_tensor, "cuda:1"), safe_move(new_slice, "cuda:1")
             # x_accs[rep_idx % self.dilation_factor] = (full_tensor, new_slice)
             x_stack = x_accs[rep_idx % self.dilation_factor][1] 
-            print('x_stack.device', x_stack.device)
+            # print('x_stack.device', x_stack.device)
             if x_stack is None:
                 raise RuntimeError(f"x_stack is None at rep_idx={rep_idx}")
             C = x_stack.shape[-1]
