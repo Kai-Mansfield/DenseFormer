@@ -321,7 +321,7 @@ class DenseFormer2(nn.Module):
                 current_group_size += 1
             x_accs.append((torch.zeros((current_group_size, *x.shape), device=x.device, dtype=x.dtype), None))
         x_accs[0] = apply_inplace_set(x_accs[0], 0, x)
-        print('x_accs[0]', x_accs[0])
+        print('x_accs[0][1]', x_accs[0][1])
         for rep_idx in range(1, self.n_repeat+1):
             if rep_idx == 1 + self.n_cuda0:
                 x = safe_move(x, "cuda:1")
@@ -334,7 +334,7 @@ class DenseFormer2(nn.Module):
                 
             )
             x_accs[rep_idx % self.dilation_factor] = (safe_move(full_tensor, "cuda:1"), safe_move(new_slice, "cuda:1"))
-            print('x_accs[0]', x_accs[0])
+            print('x_accs[0][1]', x_accs[0][1])
             print('full_tensor.device, new_slice.devic', safe_move(full_tensor, "cuda:1").device, safe_move(new_slice, "cuda:1").device)
             print('x_accs[rep_idx % self.dilation_factor][0].dev', x_accs[rep_idx % self.dilation_factor][0].device)
             print('x_accs[rep_idx % self.dilation_factor][1].dev', x_accs[rep_idx % self.dilation_factor][1].device)
