@@ -242,7 +242,7 @@ class DenseFormer2(nn.Module):
         #     self.n_cuda0 = (remaining + 1) // 2  
         #     self.n_cuda0 += max(0, n_layer - 75)
 
-        self.n_cuda0 = min(0, n_layer - 14) 
+        self.n_cuda0 = min(0, n_layer - 13) 
 
         # Now move layers
         for i, block in enumerate(self.transformer["h"]):
