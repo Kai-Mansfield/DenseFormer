@@ -1,37 +1,39 @@
 import torch
 import os
 
-def convert_checkpoint(new_ckpt_path, old_ckpt_path=None):
+def convert_checkpoint(old_ckpt_path, new_ckpt_path=None):
     """
-    Converts a checkpoint saved with keys ('model', 'opt', 'scheduler', 'itr')
-    into the older format with keys ('model', 'optimizer', 'scheduler', 'itr').
-    Creates a new checkpoint file instead of overwriting the original.
+    Converts an 'old' checkpoint saved with keys ('model', 'opt', 'scheduler', 'itr')
+    into the 'new' format with keys ('model', 'optimizer', 'scheduler', 'itr').
+
+    The original file is treated as the old-format checkpoint,
+    and the converted one is saved as the new-format checkpoint.
     """
 
-    # Load the new-format checkpoint
-    ckpt = torch.load(new_ckpt_path, map_location='cpu')
+    # Load the old-format checkpoint (actually the newer save method)
+    ckpt = torch.load(old_ckpt_path, map_location='cpu')
 
-    # Build the converted checkpoint in the old format
-    converted = {
+    # Convert to the desired format (used by save_checkpoint)
+    new_ckpt = {
         'model': ckpt['model'],
         'optimizer': ckpt.get('opt', {}),
         'scheduler': ckpt.get('scheduler', {}),
         'itr': ckpt.get('itr', 0)
     }
 
-    # Determine save path
-    if old_ckpt_path is None:
-        base, ext = os.path.splitext(new_ckpt_path)
-        old_ckpt_path = f"{base}_converted{ext}"
+    # Determine output file path
+    if new_ckpt_path is None:
+        base, ext = os.path.splitext(old_ckpt_path)
+        new_ckpt_path = f"{base}_new{ext}"
 
-        # If the converted file already exists, create a unique name
+        # Avoid overwriting
         i = 1
-        while os.path.exists(old_ckpt_path):
-            old_ckpt_path = f"{base}_converted_{i}{ext}"
+        while os.path.exists(new_ckpt_path):
+            new_ckpt_path = f"{base}_new_{i}{ext}"
             i += 1
 
-    # Save new checkpoint
-    torch.save(converted, old_ckpt_path)
-    print(f"✅ Converted checkpoint saved to: {old_ckpt_path}")
+    # Save the converted checkpoint
+    torch.save(new_ckpt, new_ckpt_path)
+    print(f"✅ Converted checkpoint saved as: {new_ckpt_path}")
 
-    return old_ckpt_path
+    return new_ckpt_path
