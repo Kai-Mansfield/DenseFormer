@@ -11,7 +11,7 @@ def convert_checkpoint(old_ckpt_path, new_ckpt_path=None):
     """
 
     # Load the old-format checkpoint (actually the newer save method)
-    ckpt = torch.load(old_ckpt_path, map_location='cpu')
+    ckpt = torch.load(old_ckpt_path, map_location='cuda:0')
 
     # Convert to the desired format (used by save_checkpoint)
     new_ckpt = {
