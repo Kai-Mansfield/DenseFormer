@@ -8,7 +8,7 @@ def convert_checkpoint(old_ckpt_path, new_ckpt_path):
         raise FileNotFoundError(f"Checkpoint not found: {old_ckpt_path}")
 
     print(f"🔹 Loading checkpoint: {old_ckpt_path}")
-    ckpt = torch.load(old_ckpt_path, map_location="cpu")
+    ckpt = torch.load(old_ckpt_path, map_location="cuda:0")
 
     # --- Extract model, optimizer, scheduler, itr ---
     model_state = ckpt.get('model', ckpt)
