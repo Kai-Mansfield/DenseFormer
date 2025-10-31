@@ -53,6 +53,7 @@ def save_checkpoint(distributed_backend, model, opt, scheduler, itr, ckpt_path,
                     scaler=None, **extra_args):
     """
     Save a full training checkpoint so resuming produces identical results.
+    Handles CPU/GPU RNGs, optimizer, scheduler, and AMP scaler.
     """
     raw_model = distributed_backend.get_raw_model(model)
     state_dict = raw_model.state_dict()
@@ -63,13 +64,17 @@ def save_checkpoint(distributed_backend, model, opt, scheduler, itr, ckpt_path,
         for k, v in state_dict.items()
     }
 
+    # Save RNG states safely
+    cpu_rng = torch.get_rng_state().cpu()  # CPU RNG must be CPU ByteTensor
+    cuda_rng = [torch.cuda.get_rng_state(i).cpu() for i in range(torch.cuda.device_count())]
+
     checkpoint = {
         'model': clean_state_dict,
         'optimizer': opt.state_dict(),
-        'scheduler': scheduler.state_dict(),
+        'scheduler': scheduler.state_dict() if scheduler is not None else None,
         'itr': itr,
-        'rng_state': torch.get_rng_state(),
-        'cuda_rng_state': torch.cuda.get_rng_state_all(),
+        'rng_state': cpu_rng,
+        'cuda_rng_state': cuda_rng,
         'numpy_rng_state': np.random.get_state(),
         'python_rng_state': random.getstate(),
     }
