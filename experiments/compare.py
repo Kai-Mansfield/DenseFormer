@@ -1,8 +1,8 @@
 import torch
 
 # Paths to your two model checkpoints
-path_uninterrupted = "model_uninterrupted.pt"
-path_resumed = "model_resumed.pt"
+path_uninterrupted = "/mnt/lustre/users/inf/kajm20/DenseFormer/experiments/exps/owt2/denseformer2/uninterrupted.pt"
+path_resumed = "/mnt/lustre/users/inf/kajm20/DenseFormer/experiments/exps/owt2/denseformer2/resumed.pt"
 
 # Load both (assume they were saved with torch.save(model.state_dict(), ...))
 state1 = torch.load(path_uninterrupted, map_location="cpu")
