@@ -130,6 +130,16 @@ def main(args):
     else:
         scheduler = None
 
+    rng_log_path = f"/mnt/lustre/users/inf/kajm20/DenseFormer/experiments/exps/owt2/denseformer2/rng_log_iter0.pt"
+    rng_states = {
+        "torch_rng_state": torch.get_rng_state(),
+        "cuda_rng_state": [torch.cuda.get_rng_state(i) for i in range(torch.cuda.device_count())],
+        "numpy_rng_state": np.random.get_state(),
+        "python_rng_state": random.getstate()
+    }
+    torch.save(rng_states, rng_log_path)
+    print(f"Saved initial RNG states (model+optimizer+scheduler) to {rng_log_path}")
+
     # === Load checkpoint if specified ===
     resume_iter = 0
     if args.use_pretrained and args.use_pretrained != "none":
@@ -154,19 +164,45 @@ def main(args):
             state = checkpoint['rng_state']
             if state.is_cuda:
                 state = state.cpu()
-            torch.set_rng_state(torch.ByteTensor(state) if not isinstance(state, torch.ByteTensor) else state)
+            torch.set_rng_state(state if isinstance(state, torch.ByteTensor) else torch.ByteTensor(state))
+
         if 'cuda_rng_state' in checkpoint:
             # ensure all are CPU ByteTensors
-            cuda_state = [s.cpu().type(torch.uint8) if not isinstance(s, torch.ByteTensor) else s.cpu() 
-                        for s in checkpoint['cuda_rng_state']]
+            cuda_state = []
+            for s in checkpoint['cuda_rng_state']:
+                s_cpu = s.cpu() if s.is_cuda else s
+                if not isinstance(s_cpu, torch.ByteTensor):
+                    s_cpu = torch.ByteTensor(s_cpu)
+                cuda_state.append(s_cpu)
             torch.cuda.set_rng_state_all(cuda_state)
+
         if 'numpy_rng_state' in checkpoint:
             np.random.set_state(checkpoint['numpy_rng_state'])
+
         if 'python_rng_state' in checkpoint:
             random.setstate(checkpoint['python_rng_state'])
 
         resume_iter = checkpoint.get('itr', 0)
         print(f"Resuming training from iteration {resume_iter}")
+
+    logged_states = torch.load(rng_log_path)
+
+    # Compare torch CPU RNG
+    cpu_match = torch.equal(checkpoint['rng_state'].cpu(), logged_states['torch_rng_state'].cpu())
+    print(f"CPU RNG match: {cpu_match}")
+
+    # Compare CUDA RNG
+    cuda_match = all(torch.equal(s.cpu(), logged_states['cuda_rng_state'][i].cpu())
+                    for i, s in enumerate(checkpoint['cuda_rng_state']))
+    print(f"CUDA RNG match: {cuda_match}")
+
+    # Compare NumPy RNG
+    np_match = np.all(np.array(checkpoint['numpy_rng_state'][1]) == np.array(logged_states['numpy_rng_state'][1]))
+    print(f"NumPy RNG match: {np_match}")
+
+    # Compare Python RNG
+    py_match = checkpoint['python_rng_state'] == logged_states['python_rng_state']
+    print(f"Python RNG match: {py_match}")
 
     args.world_size = distributed_backend.get_world_size()
     exp_name = args.exp_name
