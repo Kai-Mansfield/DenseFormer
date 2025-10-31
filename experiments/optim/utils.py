@@ -16,6 +16,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from contextlib import nullcontext, contextmanager, ExitStack
+import random
 
 
 def get_batch(data, seq_length, batch_size, device='cpu'):
