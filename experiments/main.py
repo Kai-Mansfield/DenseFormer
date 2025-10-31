@@ -152,13 +152,14 @@ def main(args):
         # Restore RNG states for deterministic continuation
         if 'rng_state' in checkpoint:
             state = checkpoint['rng_state']
-            if not isinstance(state, torch.ByteTensor):
-                state = torch.ByteTensor(state)
+            # Ensure it’s on CPU
+            if state.is_cuda:
+                state = state.cpu()
             torch.set_rng_state(state)
         if 'cuda_rng_state' in checkpoint:
             cuda_state = checkpoint['cuda_rng_state']
-            cuda_state = [torch.ByteTensor(s) if not isinstance(s, torch.ByteTensor) else s
-                        for s in cuda_state]
+            # Ensure each tensor is on the correct device
+            cuda_state = [s.to('cuda') if not s.is_cuda else s for s in cuda_state]
             torch.cuda.set_rng_state_all(cuda_state)
         if 'numpy_rng_state' in checkpoint:
             np.random.set_state(checkpoint['numpy_rng_state'])
