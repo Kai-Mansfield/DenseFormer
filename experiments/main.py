@@ -156,16 +156,10 @@ def main(args):
                 state = state.cpu()
             torch.set_rng_state(torch.ByteTensor(state) if not isinstance(state, torch.ByteTensor) else state)
         if 'cuda_rng_state' in checkpoint:
-            cuda_state = checkpoint['cuda_rng_state']
-            new_cuda_state = []
-            for i, s in enumerate(cuda_state):
-                # Ensure CPU first
-                s_cpu = s.cpu() if s.is_cuda else s
-                # Ensure type is ByteTensor
-                s_byte = s_cpu.type(torch.uint8)
-                # Move to correct device
-                new_cuda_state.append(s_byte.to(f'cuda:{i}'))
-            torch.cuda.set_rng_state_all(new_cuda_state)
+            # ensure all are CPU ByteTensors
+            cuda_state = [s.cpu().type(torch.uint8) if not isinstance(s, torch.ByteTensor) else s.cpu() 
+                        for s in checkpoint['cuda_rng_state']]
+            torch.cuda.set_rng_state_all(cuda_state)
         if 'numpy_rng_state' in checkpoint:
             np.random.set_state(checkpoint['numpy_rng_state'])
         if 'python_rng_state' in checkpoint:
