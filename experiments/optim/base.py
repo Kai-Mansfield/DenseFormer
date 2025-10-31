@@ -116,13 +116,4 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
                                 itr=itr,
                                 ckpt_path=f"{ckpt_path}/{extra_args.ckpt_name}")
 
-    if True:
-        print(f"saving checkpoint to {ckpt_path}/{extra_args.ckpt_name}")
-        save_checkpoint(distributed_backend=distributed_backend,
-                                model=model,
-                                opt=opt,
-                                scheduler=scheduler,
-                                itr=itr,
-                                ckpt_path=f"{ckpt_path}/{extra_args.ckpt_name}")
-
     return stats
