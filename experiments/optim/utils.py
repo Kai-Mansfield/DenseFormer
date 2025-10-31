@@ -48,24 +48,33 @@ def eval(model, data_tensor, sequence_length, batch_size, device='cpu', max_num_
 
     return val_acc, val_loss, val_perplexity
 
-def save_checkpoint(distributed_backend, model, opt, scheduler, itr, ckpt_path, **extra_args):
-
+def save_checkpoint(distributed_backend, model, opt, scheduler, itr, ckpt_path,
+                    scaler=None, **extra_args):
+    """
+    Save a full training checkpoint so resuming produces identical results.
+    """
     raw_model = distributed_backend.get_raw_model(model)
     state_dict = raw_model.state_dict()
 
-    # Strip _orig_mod. if present
-    clean_state_dict = {}
-    for k, v in state_dict.items():
-        new_key = k
-        if k.startswith("_orig_mod."):
-            new_key = k[len("_orig_mod."):]
-        clean_state_dict[new_key] = v
+    # Clean '_orig_mod.' prefix (common in DDP)
+    clean_state_dict = {
+        (k[len("_orig_mod."):] if k.startswith("_orig_mod.") else k): v
+        for k, v in state_dict.items()
+    }
 
-    checkpoint = dict({
+    checkpoint = {
         'model': clean_state_dict,
         'optimizer': opt.state_dict(),
         'scheduler': scheduler.state_dict(),
         'itr': itr,
-    }, **extra_args)
+        'rng_state': torch.get_rng_state(),
+        'cuda_rng_state': torch.cuda.get_rng_state_all(),
+        'numpy_rng_state': np.random.get_state(),
+        'python_rng_state': random.getstate(),
+    }
 
+    if scaler is not None:
+        checkpoint['scaler'] = scaler.state_dict()
+
+    checkpoint.update(extra_args)
     torch.save(checkpoint, ckpt_path)

@@ -135,12 +135,29 @@ def main(args):
     if args.use_pretrained and args.use_pretrained != "none":
         print(f"Loading checkpoint from {args.use_pretrained}")
         checkpoint = torch.load(args.use_pretrained, map_location=args.device)
-        if 'model' in checkpoint:
-            state_dict = checkpoint['model']
-        else:
-            state_dict = checkpoint
+
+        # Load model weights (handles DDP prefix mismatch)
+        state_dict = checkpoint['model'] if 'model' in checkpoint else checkpoint
         state_dict = adjust_state_dict(state_dict, model)
         model.load_state_dict(state_dict, strict=True)
+
+        # Restore optimizer and scheduler if present
+        if 'optimizer' in checkpoint:
+            print("Restoring optimizer state...")
+            opt.load_state_dict(checkpoint['optimizer'])
+        if 'scheduler' in checkpoint and scheduler is not None:
+            print("Restoring scheduler state...")
+            scheduler.load_state_dict(checkpoint['scheduler'])
+
+        # Restore RNG states for deterministic continuation
+        if 'rng_state' in checkpoint:
+            torch.set_rng_state(checkpoint['rng_state'])
+        if 'cuda_rng_state' in checkpoint:
+            torch.cuda.set_rng_state_all(checkpoint['cuda_rng_state'])
+        if 'numpy_rng_state' in checkpoint:
+            np.random.set_state(checkpoint['numpy_rng_state'])
+        if 'python_rng_state' in checkpoint:
+            random.setstate(checkpoint['python_rng_state'])
 
         resume_iter = checkpoint.get('itr', 0)
         print(f"Resuming training from iteration {resume_iter}")

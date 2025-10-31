@@ -118,11 +118,11 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
 
     if True:
         print(f"saving checkpoint to {ckpt_path}/{extra_args.ckpt_name}")
-        torch.save({
-            'model': model.state_dict(),
-            'opt': opt.state_dict(),
-            'scheduler': scheduler.state_dict() if scheduler else None,
-            'itr': itr
-        }, f"{ckpt_path}/{extra_args.ckpt_name}")
+        save_checkpoint(distributed_backend=distributed_backend,
+                                model=model,
+                                opt=opt,
+                                scheduler=scheduler,
+                                itr=itr,
+                                ckpt_path=f"{ckpt_path}/{extra_args.ckpt_name}")
 
     return stats
