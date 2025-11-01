@@ -130,16 +130,6 @@ def main(args):
     else:
         scheduler = None
 
-    rng_log_path = f"/mnt/lustre/users/inf/kajm20/DenseFormer/experiments/exps/owt2/denseformer2/rng_log_iter0.pt"
-    rng_states = {
-        "torch_rng_state": torch.get_rng_state(),
-        "cuda_rng_state": [torch.cuda.get_rng_state(i) for i in range(torch.cuda.device_count())],
-        "numpy_rng_state": np.random.get_state(),
-        "python_rng_state": random.getstate()
-    }
-    torch.save(rng_states, rng_log_path)
-    print(f"Saved initial RNG states (model+optimizer+scheduler) to {rng_log_path}")
-
     # === Load checkpoint if specified ===
     resume_iter = 0
     if args.use_pretrained and args.use_pretrained != "none":
