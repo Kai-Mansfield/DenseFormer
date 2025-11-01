@@ -53,10 +53,8 @@ def adjust_state_dict(state_dict, model):
     return state_dict
 
 def main(args): 
-    torch.use_deterministic_algorithms(True)
-    torch.backends.cudnn.benchmark = False
-    torch.backends.cuda.matmul.allow_tf32 = False
-    torch.backends.cudnn.allow_tf32 = False
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
 
     distributed_backend = distributed.make_backend_from_args(args)
     print(f"Using backend: {type(distributed_backend)}")
