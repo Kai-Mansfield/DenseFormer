@@ -102,7 +102,7 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
                 print_string = f"{epoch}/{itr} [train] loss={train_loss:.3f} [val] loss={val_loss:.3f}, pp={val_perplexity:.2f}, acc={val_acc:3f}"
                 print_string += f" [time per itr] {dt*1000/eval_freq:.2f}ms"
                 if scheduler is not None:
-                    print_string += f" [lr] {current_lr:.5f}"
+                    print_string += f" [lr] {current_lr:.7f}"
                 print(print_string)
 
                 if extra_args.wandb:
