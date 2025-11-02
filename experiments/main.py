@@ -175,8 +175,6 @@ def main(args):
         resume_iter = checkpoint.get('itr', 0)
         print(f"Resuming training from iteration {resume_iter}")
 
-        logged_states = torch.load(rng_log_path)
-
         # Compare torch CPU RNG
         cpu_match = torch.equal(checkpoint['rng_state'].cpu(), logged_states['torch_rng_state'].cpu())
         print(f"CPU RNG match: {cpu_match}")
