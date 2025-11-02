@@ -120,11 +120,29 @@ def main(args):
         opt = torch.optim.SGD(group_specs, lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
 
     if args.scheduler != 'none':
-        if args.scheduler in ['cos', 'linear']:
-            scheduler = torch.optim.lr_scheduler.OneCycleLR(
-                optimizer=opt, max_lr=args.lr, total_steps=args.iterations, 
-                pct_start=args.warmup_percent, anneal_strategy=args.scheduler, 
-                cycle_momentum=False, div_factor=1e2, final_div_factor=.1)
+        if args.scheduler == 'cos':
+            # Cosine decay with linear warmup
+            def lr_lambda(current_step: int):
+                warmup_steps = int(args.iterations * args.warmup_percent)
+                if current_step < warmup_steps:
+                    # Linear warmup from 0 → 1
+                    return float(current_step) / float(max(1, warmup_steps))
+                # Cosine decay from 1 → 0
+                progress = float(current_step - warmup_steps) / float(max(1, args.iterations - warmup_steps))
+                return 0.5 * (1.0 + math.cos(math.pi * progress))
+
+            scheduler = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda=lr_lambda)
+
+        elif args.scheduler == 'linear':
+            # Linear decay with warmup
+            def lr_lambda(current_step: int):
+                warmup_steps = int(args.iterations * args.warmup_percent)
+                if current_step < warmup_steps:
+                    return float(current_step) / float(max(1, warmup_steps))
+                return max(0.0, float(args.iterations - current_step) / float(max(1, args.iterations - warmup_steps)))
+
+            scheduler = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda=lr_lambda)
+
         else:
             raise NotImplementedError(f"Unknown scheduler type: {args.scheduler}.")
     else:
