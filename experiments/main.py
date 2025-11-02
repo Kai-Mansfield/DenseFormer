@@ -194,6 +194,13 @@ def main(args):
         py_match = checkpoint['python_rng_state'] == logged_states['python_rng_state']
         print(f"Python RNG match: {py_match}")
 
+    print(scheduler.__class__.__name__)
+    print(f"T_max={scheduler.T_max if hasattr(scheduler, 'T_max') else None}")
+    print(f"eta_min={scheduler.eta_min if hasattr(scheduler, 'eta_min') else None}")
+
+    for i, group in enumerate(opt.param_groups):
+    print(f"Iteration {itr}: LR = {group['lr']}")
+
     args.world_size = distributed_backend.get_world_size()
     exp_name = args.exp_name
     if distributed_backend.is_master_process() and args.wandb:
