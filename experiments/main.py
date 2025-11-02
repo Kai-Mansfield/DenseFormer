@@ -182,6 +182,9 @@ def main(args):
     for i, group in enumerate(opt.param_groups):
         print(f"Iteration {resume_iter}: LR = {group['lr']}")
 
+    print(scheduler.total_steps)
+    print(scheduler.last_epoch)
+
     args.world_size = distributed_backend.get_world_size()
     exp_name = args.exp_name
     if distributed_backend.is_master_process() and args.wandb:
