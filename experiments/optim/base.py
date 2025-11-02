@@ -72,7 +72,17 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
             torch.nn.utils.clip_grad_norm_(model.parameters(), extra_args.grad_clip)
 
         opt.step()
-        if itr < scheduler.total_steps:
+
+        if hasattr(scheduler, 'total_steps'):
+            max_steps = scheduler.total_steps
+        elif hasattr(scheduler, 'T_max'):
+            max_steps = scheduler.T_max
+        elif hasattr(scheduler, 'milestones'):
+            max_steps = scheduler.milestones[-1] if len(scheduler.milestones) > 0 else 0
+        else:
+            max_steps = args.iterations  # fallback
+
+        if itr < max_steps:
             scheduler.step()
         opt.zero_grad(set_to_none=True)
         itr += 1
