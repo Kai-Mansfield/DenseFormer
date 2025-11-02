@@ -199,7 +199,7 @@ def main(args):
     print(f"eta_min={scheduler.eta_min if hasattr(scheduler, 'eta_min') else None}")
 
     for i, group in enumerate(opt.param_groups):
-    print(f"Iteration {itr}: LR = {group['lr']}")
+        print(f"Iteration {itr}: LR = {group['lr']}")
 
     args.world_size = distributed_backend.get_world_size()
     exp_name = args.exp_name
