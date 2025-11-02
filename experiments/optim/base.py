@@ -80,7 +80,7 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
         elif hasattr(scheduler, 'milestones'):
             max_steps = scheduler.milestones[-1] if len(scheduler.milestones) > 0 else 0
         else:
-            max_steps = args.iterations  # fallback
+            max_steps = iterations  # fallback
 
         if itr < max_steps:
             scheduler.step()
