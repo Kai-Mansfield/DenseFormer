@@ -175,23 +175,6 @@ def main(args):
         resume_iter = checkpoint.get('itr', 0)
         print(f"Resuming training from iteration {resume_iter}")
 
-        # Compare torch CPU RNG
-        cpu_match = torch.equal(checkpoint['rng_state'].cpu(), logged_states['torch_rng_state'].cpu())
-        print(f"CPU RNG match: {cpu_match}")
-
-        # Compare CUDA RNG
-        cuda_match = all(torch.equal(s.cpu(), logged_states['cuda_rng_state'][i].cpu())
-                        for i, s in enumerate(checkpoint['cuda_rng_state']))
-        print(f"CUDA RNG match: {cuda_match}")
-
-        # Compare NumPy RNG
-        np_match = np.all(np.array(checkpoint['numpy_rng_state'][1]) == np.array(logged_states['numpy_rng_state'][1]))
-        print(f"NumPy RNG match: {np_match}")
-
-        # Compare Python RNG
-        py_match = checkpoint['python_rng_state'] == logged_states['python_rng_state']
-        print(f"Python RNG match: {py_match}")
-
     print(scheduler.__class__.__name__)
     print(f"T_max={scheduler.T_max if hasattr(scheduler, 'T_max') else None}")
     print(f"eta_min={scheduler.eta_min if hasattr(scheduler, 'eta_min') else None}")
