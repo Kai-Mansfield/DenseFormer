@@ -126,15 +126,20 @@ def main(args):
             def lr_lambda(current_step: int):
                 warmup_steps = int(args.iterations * args.warmup_percent)
                 max_lr = args.lr
-                min_lr = max_lr * .1
+                min_lr = max_lr * 0.1
+                
                 if current_step < warmup_steps:
-                    # Linear warmup from min_lr → max_lr
+                    # Linear warmup (scale from min→max)
                     scale = float(current_step) / float(max(1, warmup_steps))
-                    return min_lr + (max_lr - min_lr) * scale
-                # Cosine decay from max_lr → min_lr
-                progress = float(current_step - warmup_steps) / float(max(1, args.iterations - warmup_steps))
-                cosine = 0.5 * (1.0 + math.cos(math.pi * progress))  # goes 1 → 0
-                return min_lr + (max_lr - min_lr) * cosine
+                    lr = min_lr + (max_lr - min_lr) * scale
+                else:
+                    # Cosine decay
+                    progress = float(current_step - warmup_steps) / float(max(1, args.iterations - warmup_steps))
+                    cosine = 0.5 * (1.0 + math.cos(math.pi * progress))
+                    lr = min_lr + (max_lr - min_lr) * cosine
+                
+                # Return scaling factor relative to base LR
+                return lr / max_lr
 
             scheduler = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda=lr_lambda)
 
