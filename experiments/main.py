@@ -125,11 +125,11 @@ def main(args):
             # Cosine decay with linear warmup
             def lr_lambda(current_step: int):
                 warmup_steps = int(args.iterations * args.warmup_percent)
+                max_lr = args.lr
+                min_lr = max_lr * .1
                 if current_step < warmup_steps:
                     # Linear warmup from min_lr → max_lr
                     scale = float(current_step) / float(max(1, warmup_steps))
-                    max_lr = args.lr
-                    min_lr = max_lr * .1
                     return min_lr + (max_lr - min_lr) * scale
                 # Cosine decay from max_lr → min_lr
                 progress = float(current_step - warmup_steps) / float(max(1, args.iterations - warmup_steps))
