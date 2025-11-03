@@ -132,7 +132,7 @@ def main(args):
                     min_lr = max_lr * .1
                     return min_lr + (max_lr - min_lr) * scale
                 # Cosine decay from max_lr → min_lr
-                progress = float(current_step - warmup_steps) / float(max(1, iterations - warmup_steps))
+                progress = float(current_step - warmup_steps) / float(max(1, args.iterations - warmup_steps))
                 cosine = 0.5 * (1.0 + math.cos(math.pi * progress))  # goes 1 → 0
                 return min_lr + (max_lr - min_lr) * cosine
 
@@ -197,13 +197,6 @@ def main(args):
 
         resume_iter = checkpoint.get('itr', 0)
         print(f"Resuming training from iteration {resume_iter}")
-
-    print(scheduler.__class__.__name__)
-    print(f"T_max={scheduler.T_max if hasattr(scheduler, 'T_max') else None}")
-    print(f"eta_min={scheduler.eta_min if hasattr(scheduler, 'eta_min') else None}")
-
-    for i, group in enumerate(opt.param_groups):
-        print(f"Iteration {resume_iter}: LR = {group['lr']}")
 
     args.world_size = distributed_backend.get_world_size()
     exp_name = args.exp_name
