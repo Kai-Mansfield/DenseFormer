@@ -124,7 +124,7 @@ def main(args):
         if args.scheduler == 'cos':
             # Cosine decay with linear warmup
             def lr_lambda(current_step: int):
-                warmup_steps = int(iterations * warmup_percent)
+                warmup_steps = int(args.iterations * warmup_percent)
                 if current_step < warmup_steps:
                     # Linear warmup from min_lr → max_lr
                     scale = float(current_step) / float(max(1, warmup_steps))
