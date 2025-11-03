@@ -124,13 +124,17 @@ def main(args):
         if args.scheduler == 'cos':
             # Cosine decay with linear warmup
             def lr_lambda(current_step: int):
-                warmup_steps = int(args.iterations * args.warmup_percent)
+                warmup_steps = int(iterations * warmup_percent)
                 if current_step < warmup_steps:
-                    # Linear warmup from 0 → 1
-                    return float(current_step) / float(max(1, warmup_steps))
-                # Cosine decay from 1 → 0
-                progress = float(current_step - warmup_steps) / float(max(1, args.iterations - warmup_steps))
-                return 0.5 * (1.0 + math.cos(math.pi * progress))
+                    # Linear warmup from min_lr → max_lr
+                    scale = float(current_step) / float(max(1, warmup_steps))
+                    max_lr = args.lr
+                    min_lr = max_lr * .1
+                    return min_lr + (max_lr - min_lr) * scale
+                # Cosine decay from max_lr → min_lr
+                progress = float(current_step - warmup_steps) / float(max(1, iterations - warmup_steps))
+                cosine = 0.5 * (1.0 + math.cos(math.pi * progress))  # goes 1 → 0
+                return min_lr + (max_lr - min_lr) * cosine
 
             scheduler = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda=lr_lambda)
 
