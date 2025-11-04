@@ -20,7 +20,7 @@ from datasets import Dataset
 import glob
 import json 
 
-OWT2_DATA_PATH = os.path.join(os.path.dirname(__file__), "datasets/openwebtext2-test_split/")
+OWT2_DATA_PATH = '/mnt/lustre/users/inf/kajm20/df/openwebtext2-test_split'
 tknzr = tiktoken.get_encoding("gpt2")
 
 
@@ -48,7 +48,7 @@ def get_openwebtext2_data(config):
 
         # === Create train / val / test splits ===
         # First split into (train+val) and test
-        split_1 = dataset.train_test_split(test_size=0.0005, shuffle=True)
+        split_1 = dataset.train_test_split(test_size=0.0005, seed=2357, shuffle=False)
         test_dataset = split_1["test"]
 
         # Now split (train+val)
