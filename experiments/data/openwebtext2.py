@@ -20,7 +20,7 @@ from datasets import Dataset
 import glob
 import json 
 
-OWT2_DATA_PATH = os.path.join(os.path.dirname(__file__), "datasets/openwebtext2/")
+OWT2_DATA_PATH = os.path.join(os.path.dirname(__file__), "datasets/openwebtext2-test_split/")
 tknzr = tiktoken.get_encoding("gpt2")
 
 
