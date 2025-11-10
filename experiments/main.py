@@ -127,7 +127,7 @@ def main(args):
                 warmup_steps = int(args.iterations * args.warmup_percent)
                 max_lr = args.lr
                 min_lr = max_lr * 0.1
-                
+
                 if current_step < warmup_steps:
                     # Linear warmup (scale from min→max)
                     scale = float(current_step) / float(max(1, warmup_steps))
@@ -137,7 +137,7 @@ def main(args):
                     progress = float(current_step - warmup_steps) / float(max(1, args.iterations - warmup_steps))
                     cosine = 0.5 * (1.0 + math.cos(math.pi * progress))
                     lr = min_lr + (max_lr - min_lr) * cosine
-                
+
                 # Return scaling factor relative to base LR
                 return lr / max_lr
 
@@ -152,6 +152,18 @@ def main(args):
                 return max(0.0, float(args.iterations - current_step) / float(max(1, args.iterations - warmup_steps)))
 
             scheduler = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda=lr_lambda)
+
+        elif args.scheduler == 'plateau':
+            # Reduce LR when validation loss plateaus
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                opt,
+                mode='min',           # minimize validation loss
+                factor=0.9,           # reduce LR by half
+                patience=1,           # epochs (or evals) to wait before reducing
+                threshold=1e-4,       # minimal improvement to be considered progress
+                min_lr=args.lr * 0.1, # don't go below 10% of base LR
+                verbose=True          # log when LR changes
+            )
 
         else:
             raise NotImplementedError(f"Unknown scheduler type: {args.scheduler}.")

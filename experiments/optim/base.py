@@ -82,11 +82,6 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
         else:
             max_steps = iterations  # fallback
 
-        if itr < max_steps:
-            scheduler.step()
-        opt.zero_grad(set_to_none=True)
-        itr += 1
-
         if itr % eval_freq == 0 or itr == iterations: # from here it's only evaluation code, all the training is above
             if True:
                 t1 = time.time()
@@ -119,6 +114,15 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
 
                 model.train()
                 t0 = time.time()
+
+        if itr < max_steps:
+            if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                scheduler.step(val_loss)
+            else:
+                scheduler.step()
+        opt.zero_grad(set_to_none=True)
+        itr += 1
+        
         if True:
             if extra_args.save_checkpoint_freq is not None and itr % extra_args.save_checkpoint_freq == 0:
                 save_checkpoint(distributed_backend=distributed_backend,
