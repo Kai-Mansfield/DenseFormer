@@ -122,19 +122,26 @@ def main(args):
 
     if args.scheduler != 'none':
         if args.scheduler == 'cos':
-            # Cosine decay with linear warmup
+            # Cosine decay with linear warmup and custom start iteration
             def lr_lambda(current_step: int):
                 warmup_steps = int(args.iterations * args.warmup_percent)
                 max_lr = args.lr
                 min_lr = max_lr * 0.1
+                start_iter = args.start_iter  # default to 0 if not provided
 
                 if current_step < warmup_steps:
                     # Linear warmup (scale from min→max)
                     scale = float(current_step) / float(max(1, warmup_steps))
                     lr = min_lr + (max_lr - min_lr) * scale
+
+                elif current_step < start_iter:
+                    # Maintain max LR until decay starts
+                    lr = max_lr
+
                 else:
-                    # Cosine decay
-                    progress = float(current_step - warmup_steps) / float(max(1, args.iterations - warmup_steps))
+                    # Cosine decay from start_iter → args.iterations
+                    progress = float(current_step - start_iter) / float(max(1, args.iterations - start_iter))
+                    progress = min(max(progress, 0.0), 1.0)  # clamp to [0,1]
                     cosine = 0.5 * (1.0 + math.cos(math.pi * progress))
                     lr = min_lr + (max_lr - min_lr) * cosine
 
