@@ -111,92 +111,130 @@ def main(args):
         optimized_params_cnt += sum([p.numel() for p in g["params"]])
     print("number of optimized parameters: %.2fM" % (optimized_params_cnt / 1e6))
 
-    if args.opt == 'adamw':
-        use_fused = (device_type == 'cuda') and ('fused' in inspect.signature(torch.optim.AdamW).parameters)
-        print(f"using fused AdamW: {use_fused}")
-        extra_args = dict(fused=True) if use_fused else dict()
-        opt = torch.optim.AdamW(group_specs, lr=args.lr, betas=(args.beta1, args.beta2),
-                                weight_decay=args.weight_decay, **extra_args)
-    else:
-        opt = torch.optim.SGD(group_specs, lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
-    for g in opt.param_groups:
-        g['initial_lr'] = args.lr
+    # -----------------------
+    #  OPTIMIZER CREATION
+    # -----------------------
+    use_fused = (device_type == 'cuda') and ('fused' in inspect.signature(torch.optim.AdamW).parameters)
+    print(f"Using fused AdamW: {use_fused}")
 
-    if args.scheduler != 'none':
+    if args.opt == 'adamw':
+        extra_args = dict(fused=True) if use_fused else {}
+        opt = torch.optim.AdamW(
+            group_specs,
+            lr=args.lr,
+            betas=(args.beta1, args.beta2),
+            weight_decay=args.weight_decay,
+            **extra_args
+        )
+    elif args.opt == 'sgd':
+        opt = torch.optim.SGD(
+            group_specs,
+            lr=args.lr,
+            momentum=0.9,
+            weight_decay=args.weight_decay
+        )
+    else:
+        raise ValueError(f"Unknown optimizer: {args.opt}")
+
+    # Ensure schedulers have valid base LR reference
+    for g in opt.param_groups:
+        g.setdefault('initial_lr', args.lr)
+
+
+    # -----------------------
+    #  SCHEDULER CREATION
+    # -----------------------
+    def make_scheduler(opt):
+        if args.scheduler == 'none':
+            return None
+
         if args.scheduler == 'cos':
-            # Cosine decay with linear warmup and custom start iteration
             def lr_lambda(current_step: int):
                 warmup_steps = int(args.iterations * args.warmup_percent)
                 max_lr = args.lr
                 min_lr = max_lr * 0.1
-                start_iter = args.start_iter  # default to 0 if not provided
+                start_iter = getattr(args, 'start_iter', 0)
 
                 if current_step < warmup_steps:
-                    # Linear warmup (scale from min→max)
+                    # Linear warmup
                     scale = float(current_step) / float(max(1, warmup_steps))
                     lr = min_lr + (max_lr - min_lr) * scale
-
                 elif current_step < start_iter:
-                    # Maintain max LR until decay starts
                     lr = max_lr
-
                 else:
-                    # Cosine decay from start_iter → args.iterations
+                    # Cosine decay
                     progress = float(current_step - start_iter) / float(max(1, args.iterations - start_iter))
-                    progress = min(max(progress, 0.0), 1.0)  # clamp to [0,1]
+                    progress = min(max(progress, 0.0), 1.0)
                     cosine = 0.5 * (1.0 + math.cos(math.pi * progress))
                     lr = min_lr + (max_lr - min_lr) * cosine
 
-                # Return scaling factor relative to base LR
                 return lr / max_lr
 
-            scheduler = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda=lr_lambda, last_epoch=args.start_iter)
+            return torch.optim.lr_scheduler.LambdaLR(
+                opt,
+                lr_lambda=lr_lambda,
+                last_epoch=getattr(args, 'start_iter', 0)
+            )
 
         elif args.scheduler == 'linear':
-            # Linear decay with warmup
             def lr_lambda(current_step: int):
                 warmup_steps = int(args.iterations * args.warmup_percent)
                 if current_step < warmup_steps:
                     return float(current_step) / float(max(1, warmup_steps))
-                return max(0.0, float(args.iterations - current_step) / float(max(1, args.iterations - warmup_steps)))
+                return max(0.0, float(args.iterations - current_step) /
+                            float(max(1, args.iterations - warmup_steps)))
 
-            scheduler = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda=lr_lambda)
+            return torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda=lr_lambda)
 
         elif args.scheduler == 'plateau':
-            # Reduce LR when validation loss plateaus
-            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            return torch.optim.lr_scheduler.ReduceLROnPlateau(
                 opt,
-                mode='min',           # minimize validation loss
-                factor=0.9,           # reduce LR by half
-                patience=1,           # epochs (or evals) to wait before reducing
-                threshold=1e-4,       # minimal improvement to be considered progress
-                min_lr=args.lr * 0.1, # don't go below 10% of base LR
-                verbose=True          # log when LR changes
+                mode='min',
+                factor=0.9,
+                patience=1,
+                threshold=1e-4,
+                min_lr=args.lr * 0.1,
+                verbose=True
             )
 
-        else:
-            raise NotImplementedError(f"Unknown scheduler type: {args.scheduler}.")
-    else:
-        scheduler = None
+        raise NotImplementedError(f"Unknown scheduler: {args.scheduler}")
 
-    # === Load checkpoint if specified ===
+
+    scheduler = make_scheduler(opt)
+
+
+    # -----------------------
+    #  CHECKPOINT LOADING
+    # -----------------------
     resume_iter = 0
     if args.use_pretrained and args.use_pretrained != "none":
         print(f"Loading checkpoint from {args.use_pretrained}")
         checkpoint = torch.load(args.use_pretrained, map_location=args.device)
 
-        # Load model weights (handles DDP prefix mismatch)
-        state_dict = checkpoint['model'] if 'model' in checkpoint else checkpoint
+        # Load model weights
+        state_dict = checkpoint.get('model', checkpoint)
         state_dict = adjust_state_dict(state_dict, model)
         model.load_state_dict(state_dict, strict=True)
 
-        # Restore optimizer and scheduler if present
+        # Restore optimizer
         if 'optimizer' in checkpoint:
             print("Restoring optimizer state...")
             opt.load_state_dict(checkpoint['optimizer'])
+
+        # Restore scheduler (if compatible)
         if 'scheduler' in checkpoint and scheduler is not None:
             print("Restoring scheduler state...")
-            scheduler.load_state_dict(checkpoint['scheduler'])
+            try:
+                scheduler.load_state_dict(checkpoint['scheduler'])
+            except Exception as e:
+                print(f"⚠️ Could not load scheduler state: {e}")
+
+        # Optional: override base LR if specified
+        if args.lr is not None:
+            print(f"Overriding checkpoint LR with {args.lr:.2e}")
+            for g in opt.param_groups:
+                g['lr'] = args.lr
+                g['initial_lr'] = args.lr
 
         # Restore RNG states for deterministic continuation
         if 'rng_state' in checkpoint:
