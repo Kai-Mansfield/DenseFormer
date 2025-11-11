@@ -119,6 +119,8 @@ def main(args):
                                 weight_decay=args.weight_decay, **extra_args)
     else:
         opt = torch.optim.SGD(group_specs, lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
+    for g in opt.param_groups:
+        g['initial_lr'] = args.lr
 
     if args.scheduler != 'none':
         if args.scheduler == 'cos':
@@ -192,8 +194,6 @@ def main(args):
         if 'optimizer' in checkpoint:
             print("Restoring optimizer state...")
             opt.load_state_dict(checkpoint['optimizer'])
-            for g in opt.param_groups:
-                g['initial_lr'] = args.lr
         if 'scheduler' in checkpoint and scheduler is not None:
             print("Restoring scheduler state...")
             scheduler.load_state_dict(checkpoint['scheduler'])
