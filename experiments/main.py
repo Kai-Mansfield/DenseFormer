@@ -148,7 +148,7 @@ def main(args):
                 # Return scaling factor relative to base LR
                 return lr / max_lr
 
-            scheduler = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda=lr_lambda, last_epoch=args.start_iter)
+            scheduler = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda=lr_lambda)
 
         elif args.scheduler == 'linear':
             # Linear decay with warmup
@@ -192,6 +192,8 @@ def main(args):
         if 'optimizer' in checkpoint:
             print("Restoring optimizer state...")
             opt.load_state_dict(checkpoint['optimizer'])
+            for g in opt.param_groups:
+                g['initial_lr'] = args.lr
         if 'scheduler' in checkpoint and scheduler is not None:
             print("Restoring scheduler state...")
             scheduler.load_state_dict(checkpoint['scheduler'])
