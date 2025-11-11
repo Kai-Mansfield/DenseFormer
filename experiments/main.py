@@ -148,8 +148,7 @@ def main(args):
                 # Return scaling factor relative to base LR
                 return lr / max_lr
 
-            scheduler = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda=lr_lambda)
-            scheduler.step(args.start_iter)
+            scheduler = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda=lr_lambda, last_epoch=args.start_iter)
 
         elif args.scheduler == 'linear':
             # Linear decay with warmup
