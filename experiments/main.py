@@ -202,10 +202,7 @@ def main(args):
 
     scheduler = make_scheduler(opt)
 
-
-    # -----------------------
-    #  CHECKPOINT LOADING
-    # -----------------------
+    # === Load checkpoint if specified ===
     resume_iter = 0
     if args.use_pretrained and args.use_pretrained != "none":
         print(f"Loading checkpoint from {args.use_pretrained}")
@@ -216,25 +213,25 @@ def main(args):
         state_dict = adjust_state_dict(state_dict, model)
         model.load_state_dict(state_dict, strict=True)
 
-        # Restore optimizer
+        # Restore optimizer + scheduler
         if 'optimizer' in checkpoint:
             print("Restoring optimizer state...")
             opt.load_state_dict(checkpoint['optimizer'])
-
-        # Restore scheduler (if compatible)
         if 'scheduler' in checkpoint and scheduler is not None:
             print("Restoring scheduler state...")
-            try:
-                scheduler.load_state_dict(checkpoint['scheduler'])
-            except Exception as e:
-                print(f"⚠️ Could not load scheduler state: {e}")
+            scheduler.load_state_dict(checkpoint['scheduler'])
 
-        # Optional: override base LR if specified
+        # === OVERRIDE LR ===
         if args.lr is not None:
             print(f"Overriding checkpoint LR with {args.lr:.2e}")
             for g in opt.param_groups:
                 g['lr'] = args.lr
                 g['initial_lr'] = args.lr
+
+            # Force scheduler to recompute based on new LR
+            if isinstance(scheduler, torch.optim.lr_scheduler.LambdaLR):
+                scheduler.base_lrs = [args.lr for _ in scheduler.base_lrs]
+                scheduler.step(scheduler.last_epoch)  # resync internal state
 
         # Restore RNG states for deterministic continuation
         if 'rng_state' in checkpoint:
