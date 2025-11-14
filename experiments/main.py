@@ -176,6 +176,17 @@ def main(args):
                 last_epoch=getattr(args, 'start_iter', 0)
             )
 
+        elif args.scheduler == 'constant':
+            # lr_lambda should always return 1.0 → LR stays at args.lr
+            def lr_lambda(current_step: int):
+                return 1.0
+
+            return torch.optim.lr_scheduler.LambdaLR(
+                opt,
+                lr_lambda=lr_lambda,
+                last_epoch=getattr(args, 'start_iter', -1)
+            )
+
         elif args.scheduler == 'linear':
             def lr_lambda(current_step: int):
                 warmup_steps = int(args.iterations * args.warmup_percent)
