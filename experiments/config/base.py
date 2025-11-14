@@ -46,7 +46,7 @@ def parse_args(base_parser, args, namespace):
     parser.add_argument('--weight_decay', default=1e-3, type=float)
     parser.add_argument('--beta1', default=0.9, type=float)
     parser.add_argument('--beta2', default=0.95, type=float)
-    parser.add_argument('--scheduler', default='cos', choices=['linear', 'cos', 'none'])
+    parser.add_argument('--scheduler', default='cos', choices=['linear', 'cos', 'none', 'constant'])
     parser.add_argument('--opt', default='adamw', choices=['adamw', 'sgd'])
     parser.add_argument('--eval_freq', default=200, type=int) # in iterations
     parser.add_argument('--results_base_folder', default="/mnt/lustre/users/inf/kajm20/DenseFormer/experiments/exps", type=str)
