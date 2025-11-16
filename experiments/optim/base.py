@@ -146,7 +146,7 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
                                 scheduler=scheduler,
                                 itr=itr,
                                 ckpt_path=f"{ckpt_path}/{extra_args.ckpt_name}")
-                with open(f"{ckpt_path}/{extra_args.ckpt_name}_grad_norms.txt", "w") as f:
+                with open(f"{ckpt_path}/{extra_args.ckpt_name}_grad_norms.txt", "a") as f:
                     for g in gn:
                         f.write(f"{g}\n")
                 gn = []
