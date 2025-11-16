@@ -74,10 +74,10 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
 
             loss = outputs['loss']
             loss.backward()
-            gn = grad_norm(model)
-            print(f"grad_norm={gn:.4f}")
             substep += 1
 
+        gn = grad_norm(model)
+        print(f"grad_norm={gn:.4f}")
         if extra_args.grad_clip != 0.0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), extra_args.grad_clip)
 
