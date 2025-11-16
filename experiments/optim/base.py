@@ -49,6 +49,7 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
         model = torch.compile(model) # requires pytorch 2.0+
 
     model.train()
+    gn = []
 
     t0 = time.time()
 
@@ -76,13 +77,10 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
             loss.backward()
             substep += 1
 
-        gn = grad_norm(model)
-        print(f"grad_norm={gn:.4f}")
+        gn.append(grad_norm(model))
         if extra_args.grad_clip != 0.0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), extra_args.grad_clip)
 
-        gn = grad_norm(model)
-        print(f"grad_norm={gn:.4f}")
         opt.step()
 
         if hasattr(scheduler, 'total_steps'):
@@ -149,5 +147,11 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
                                 itr=itr,
                                 ckpt_path=f"{ckpt_path}/{extra_args.ckpt_name}")
                 print(f"saved checkpoint to {ckpt_path}/{extra_args.ckpt_name}")
+
+    output_path = f"{ckpt_path}/{extra_args.ckpt_name}_grad_norms.txt"
+
+    with open(output_path, "w") as f:
+        for gn in grad_norms:
+            f.write(f"{gn}\n")
 
     return stats
