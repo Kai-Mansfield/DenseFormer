@@ -24,6 +24,14 @@ import sys
 
 from .utils import eval, get_batch, save_checkpoint
 
+def grad_norm(model):
+    total_norm = 0.0
+    for p in model.parameters():
+        if p.grad is not None:
+            param_norm = p.grad.data.norm(2)
+            total_norm += param_norm.item() ** 2
+    return total_norm ** 0.5
+
 def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, sequence_length, eval_freq, ckpt_path, distributed_backend, extra_args, srt_iter=0):
     device_type = 'cuda' if 'cuda' in str(extra_args.device) else 'cpu'
     type_ctx = nullcontext() if device_type == 'cpu' else torch.amp.autocast(
@@ -66,11 +74,15 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
 
             loss = outputs['loss']
             loss.backward()
+            gn = grad_norm(model)
+            print(f"grad_norm={gn:.4f}")
             substep += 1
 
         if extra_args.grad_clip != 0.0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), extra_args.grad_clip)
 
+        gn = grad_norm(model)
+        print(f"grad_norm={gn:.4f}")
         opt.step()
 
         if hasattr(scheduler, 'total_steps'):
