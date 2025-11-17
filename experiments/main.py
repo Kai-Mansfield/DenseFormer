@@ -224,21 +224,6 @@ def main(args):
         state_dict = adjust_state_dict(state_dict, model)
         model.load_state_dict(state_dict, strict=True)
 
-        # Resolve actual underlying model (handles DDP and _orig_mod)
-        m = model
-        if hasattr(m, "module"):
-            m = m.module
-        if hasattr(m, "_orig_mod"):
-            m = m._orig_mod
-
-        # Now inspect layer 21
-        w = m.weights[21].weight
-        print("weights[21].weight shape:", w.shape)
-        print("num params:", w.numel())
-        w = m.weights[19].weight
-        print("weights[19].weight shape:", w.shape)
-        print("num params:", w.numel())
-
         # Restore optimizer + scheduler
         if 'optimizer' in checkpoint:
             print("Restoring optimizer state...")

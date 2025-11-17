@@ -94,7 +94,7 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
         layer_grads = sorted(layer_grads, key=lambda x: x[1], reverse=True)
 
         print("[DEBUG] top gradient layers:")
-        for name, g in layer_grads[:8]:
+        for name, g in layer_grads:
             print(f"  {name:60s} {g:.4f}")
 
         # ---- OPTIMIZER BUFFERS (Adam) ----
