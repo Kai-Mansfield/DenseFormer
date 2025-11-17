@@ -140,7 +140,6 @@ def main(args):
     for g in opt.param_groups:
         g.setdefault('initial_lr', args.lr)
 
-
     # -----------------------
     #  SCHEDULER CREATION
     # -----------------------
@@ -269,6 +268,13 @@ def main(args):
 
         resume_iter = checkpoint.get('itr', 0)
         print(f"Resuming training from iteration {resume_iter}")
+
+    dense_params = set(id(p) for n, p in model.named_parameters()
+                   if n.startswith("_orig_mod.weights"))
+    for g in opt.param_groups:
+        # If any param in this group belongs to DenseFormer
+        if any(id(p) in dense_params for p in g["params"]):
+            g["lr"] = args.lr * 0.1
 
     args.world_size = distributed_backend.get_world_size()
     exp_name = args.exp_name
