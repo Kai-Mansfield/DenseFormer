@@ -224,6 +224,10 @@ def main(args):
         state_dict = adjust_state_dict(state_dict, model)
         model.load_state_dict(state_dict, strict=True)
 
+        w = model._orig_mod.weights[21].weight
+        print("shape:", w.shape)
+        print("num params:", w.numel())
+
         # Restore optimizer + scheduler
         if 'optimizer' in checkpoint:
             print("Restoring optimizer state...")
