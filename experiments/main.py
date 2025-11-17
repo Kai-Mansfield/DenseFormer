@@ -275,6 +275,11 @@ def main(args):
         # If any param in this group belongs to DenseFormer
         if any(id(p) in dense_params for p in g["params"]):
             g["lr"] = args.lr * 0.1
+    for i, g in enumerate(opt.param_groups):
+        group_dense = sum(1 for p in g["params"] if id(p) in dense_params)
+        group_total = len(g["params"])
+        print(f"Param group {i}: {group_dense}/{group_total} are DenseFormer params")
+        print(f"  current lr: {g['lr']}, weight_decay: {g.get('weight_decay')}")
 
     args.world_size = distributed_backend.get_world_size()
     exp_name = args.exp_name
