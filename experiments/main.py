@@ -244,9 +244,6 @@ def main(args):
                 scheduler.base_lrs = [args.lr for _ in scheduler.base_lrs]
                 scheduler.step(scheduler.last_epoch)  # resync internal state
 
-        for i, g in enumerate(opt.param_groups):
-            print(f"param_group[{i}] lr={g.get('lr')}, initial_lr={g.get('initial_lr', None)}, weight_decay={g.get('weight_decay')}")
-
         # Restore RNG states for deterministic continuation
         if 'rng_state' in checkpoint:
             state = checkpoint['rng_state']

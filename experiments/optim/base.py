@@ -49,7 +49,6 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
         model = torch.compile(model) # requires pytorch 2.0+
 
     model.train()
-    gn = []
 
     t0 = time.time()
 
@@ -77,7 +76,34 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
             loss.backward()
             substep += 1
 
-        gn.append(grad_norm(model))
+        # ---- RAW GRAD NORM BEFORE CLIPPING ----
+        total_norm = 0.0
+        for p in model.parameters():
+            if p.grad is not None:
+                param_norm = p.grad.data.norm(2)
+                total_norm += param_norm.item() ** 2
+        total_norm = (total_norm ** 0.5)
+
+        print(f"[DEBUG] raw_grad_norm={total_norm:.4f}, loss={loss.item():.5f}")
+
+        # ---- TOP LAYERS ----
+        layer_grads = []
+        for name, p in model.named_parameters():
+            if p.grad is not None:
+                layer_grads.append((name, p.grad.data.norm().item()))
+        layer_grads = sorted(layer_grads, key=lambda x: x[1], reverse=True)
+
+        print("[DEBUG] top gradient layers:")
+        for name, g in layer_grads[:8]:
+            print(f"  {name:60s} {g:.4f}")
+
+        # ---- OPTIMIZER BUFFERS (Adam) ----
+        for k, v in opt.state.items():
+            if 'exp_avg' in v:
+                print("[DEBUG] optimizer exp_avg norm:", v['exp_avg'].norm().item())
+                print("[DEBUG] optimizer exp_avg_sq mean:", v['exp_avg_sq'].mean().item())
+            break
+
         if extra_args.grad_clip != 0.0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), extra_args.grad_clip)
 
@@ -129,14 +155,6 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
 
                 model.train()
                 t0 = time.time()
-
-        # if itr < max_steps:
-        #     if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-        #         scheduler.step(val_loss)
-        #     else:
-        #         scheduler.step()
-        # opt.zero_grad(set_to_none=True)
-        # itr += 1
         
         if True:
             if extra_args.save_checkpoint_freq is not None and itr % extra_args.save_checkpoint_freq == 0:
@@ -146,10 +164,6 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
                                 scheduler=scheduler,
                                 itr=itr,
                                 ckpt_path=f"{ckpt_path}/{extra_args.ckpt_name}")
-                with open(f"{ckpt_path}/{extra_args.ckpt_name}_grad_norms.txt", "a") as f:
-                    for g in gn:
-                        f.write(f"{g}\n")
-                gn = []
                 print(f"saved checkpoint to {ckpt_path}/{extra_args.ckpt_name}")
 
     return stats
