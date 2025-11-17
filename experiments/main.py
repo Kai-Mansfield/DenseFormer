@@ -280,6 +280,14 @@ def main(args):
         group_total = len(g["params"])
         print(f"Param group {i}: {group_dense}/{group_total} are DenseFormer params")
         print(f"  current lr: {g['lr']}, weight_decay: {g.get('weight_decay')}")
+    for i, group in enumerate(opt.param_groups):
+        print(f"Param group {i}:")
+        print(f"  lr: {group['lr']}, weight_decay: {group['weight_decay']}")
+        for j, p in enumerate(group['params']):
+            if p is not None:
+                # Print parameter name if available
+                name = next((n for n, param in model.named_parameters() if param is p), None)
+                print(f"    param {j}: {name}, shape: {p.shape}, requires_grad: {p.requires_grad}")
 
     args.world_size = distributed_backend.get_world_size()
     exp_name = args.exp_name
