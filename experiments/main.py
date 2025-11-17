@@ -235,6 +235,9 @@ def main(args):
         w = m.weights[21].weight
         print("weights[21].weight shape:", w.shape)
         print("num params:", w.numel())
+        w = m.weights[19].weight
+        print("weights[19].weight shape:", w.shape)
+        print("num params:", w.numel())
 
         # Restore optimizer + scheduler
         if 'optimizer' in checkpoint:
