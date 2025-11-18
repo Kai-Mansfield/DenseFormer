@@ -65,7 +65,7 @@ def verify_group_lrs(model, opt):
         # Locate which actual optimizer group this param belongs to
         found_group = None
         for i, g in enumerate(opt.param_groups):
-            if p in g["params"]:
+            if any(p is q for q in g["params"]):
                 found_group = i
                 group = g
                 break
