@@ -105,7 +105,7 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
             break
 
         # Pick a denseformer param for verification
-        param_name_to_test = "weights.0.weight"
+        param_name_to_test = "_orig_mod.weights.0.weight"
 
         for i, group in enumerate(opt.param_groups):
             for p in group["params"]:
