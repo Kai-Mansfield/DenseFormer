@@ -140,7 +140,6 @@ def main(args):
         extra_args = dict(fused=True) if use_fused else {}
         opt = torch.optim.AdamW(
             group_specs,
-            lr=args.lr,
             betas=(args.beta1, args.beta2),
             weight_decay=args.weight_decay,
             **extra_args
