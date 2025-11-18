@@ -209,7 +209,6 @@ def main(args):
 
         raise NotImplementedError(f"Unknown scheduler: {args.scheduler}")
 
-
     scheduler = make_scheduler(opt)
 
     # === Load checkpoint if specified ===
@@ -224,24 +223,24 @@ def main(args):
         model.load_state_dict(state_dict, strict=True)
 
         # Restore optimizer + scheduler
-        if 'optimizer' in checkpoint:
-            print("Restoring optimizer state...")
-            opt.load_state_dict(checkpoint['optimizer'])
+        # if 'optimizer' in checkpoint:
+        #     print("Restoring optimizer state...")
+        #     opt.load_state_dict(checkpoint['optimizer'])
         if 'scheduler' in checkpoint and scheduler is not None:
             print("Restoring scheduler state...")
             scheduler.load_state_dict(checkpoint['scheduler'])
 
         # === OVERRIDE LR ===
-        if args.lr is not None:
-            print(f"Overriding checkpoint LR with {args.lr:.2e}")
-            for g in opt.param_groups:
-                g['lr'] = args.lr
-                g['initial_lr'] = args.lr
+        # if args.lr is not None:
+        #     print(f"Overriding checkpoint LR with {args.lr:.2e}")
+        #     for g in opt.param_groups:
+        #         g['lr'] = args.lr
+        #         g['initial_lr'] = args.lr
 
-            # Force scheduler to recompute based on new LR
-            if isinstance(scheduler, torch.optim.lr_scheduler.LambdaLR):
-                scheduler.base_lrs = [args.lr for _ in scheduler.base_lrs]
-                scheduler.step(scheduler.last_epoch)  # resync internal state
+        #     # Force scheduler to recompute based on new LR
+        #     if isinstance(scheduler, torch.optim.lr_scheduler.LambdaLR):
+        #         scheduler.base_lrs = [args.lr for _ in scheduler.base_lrs]
+        #         scheduler.step(scheduler.last_epoch)  # resync internal state
 
         # Restore RNG states for deterministic continuation
         if 'rng_state' in checkpoint:
