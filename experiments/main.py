@@ -96,7 +96,7 @@ def main(args):
     model = models.make_model_from_args(args)
     model = distributed_backend.transform_model(model)
 
-    group_specs = distributed_backend.get_raw_model(model).get_parameter_group_specs()
+    group_specs = distributed_backend.get_raw_model(model).get_parameter_group_specs(dense_lr=.1 * args.lr, dense_weight_decay=args.weight_decay)
     param_name_mapping = {p_name: p for p_name, p in model.named_parameters()}
     optimized_params_cnt = 0
     for g in group_specs:
@@ -269,17 +269,6 @@ def main(args):
         resume_iter = checkpoint.get('itr', 0)
         print(f"Resuming training from iteration {resume_iter}")
 
-    dense_params = set(id(p) for n, p in model.named_parameters()
-                   if n.startswith("_orig_mod.weights"))
-    for g in opt.param_groups:
-        # If any param in this group belongs to DenseFormer
-        if any(id(p) in dense_params for p in g["params"]):
-            g["lr"] = args.lr * 0.1
-    for i, g in enumerate(opt.param_groups):
-        group_dense = sum(1 for p in g["params"] if id(p) in dense_params)
-        group_total = len(g["params"])
-        print(f"Param group {i}: {group_dense}/{group_total} are DenseFormer params")
-        print(f"  current lr: {g['lr']}, weight_decay: {g.get('weight_decay')}")
     for i, group in enumerate(opt.param_groups):
         print(f"Param group {i}:")
         for k, v in group.items():
@@ -290,7 +279,6 @@ def main(args):
                 # Print parameter name if available
                 name = next((n for n, param in model.named_parameters() if param is p), None)
                 print(f"    param {j}: {name}, shape: {p.shape}, requires_grad: {p.requires_grad}")
-
 
     args.world_size = distributed_backend.get_world_size()
     exp_name = args.exp_name

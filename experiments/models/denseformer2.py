@@ -393,56 +393,61 @@ class DenseFormer2(nn.Module):
         # TODO
         pass
 
-    def get_parameter_group_specs(self):
-       """
-       This long function is unfortunately doing something very simple and is being very defensive:
-       We are separating out all parameters of the model into two buckets: those that will experience
-       weight decay for regularization and those that won't (biases, and layernorm/embedding weights).
-       We are then returning the PyTorch optimizer object.
-       """
-    
-       # separate out all parameters to those that will and won't experience regularizing weight decay
-       decay = set()
-       no_decay = set()
-       whitelist_weight_modules = (torch.nn.Linear, )
-       blacklist_weight_modules = (torch.nn.LayerNorm, LayerNorm, torch.nn.Embedding)
-       for mn, m in self.named_modules():
-           for pn, p in m.named_parameters():
-               fpn = '%s.%s' % (mn, pn) if mn else pn # full param name
-               # random note: because named_modules and named_parameters are recursive
-               # we will see the same tensors p many many times. but doing it this way
-               # allows us to know which parent module any tensor p belongs to...
-               if pn.endswith('bias'):
-                   # all biases will not be decayed
-                   no_decay.add(fpn)
-               elif pn.endswith('weight') and isinstance(m, whitelist_weight_modules):
-                   # weights of whitelist modules will be weight decayed
-                   decay.add(fpn)
-               elif pn.endswith('weight') and isinstance(m, blacklist_weight_modules):
-                   # weights of blacklist modules will NOT be weight decayed
-                   no_decay.add(fpn)
-    
-       # subtle: 'transformer.wte.weight' and 'lm_head.weight' are tied, so they
-       # will appear in the no_decay and decay sets respectively after the above.
-       # In addition, because named_parameters() doesn't return duplicates, it
-       # will only return the first occurence, key'd by 'transformer.wte.weight', below.
-       # so let's manually remove 'lm_head.weight' from decay set. This will include
-       # this tensor into optimization via transformer.wte.weight only, and not decayed.
-       decay.remove('lm_head.weight')
-    
-       # validate that we considered every parameter
-       param_dict = {pn: p for pn, p in self.named_parameters()}
-       inter_params = decay & no_decay
-       union_params = decay | no_decay
-       assert len(inter_params) == 0, "parameters %s made it into both decay/no_decay sets!" % (str(inter_params), )
-       assert len(param_dict.keys() - union_params) == 0, "parameters %s were not separated into either decay/no_decay set!" \
-                                                   % (str(param_dict.keys() - union_params), )
-    
-       # create the pytorch optimizer object
-       return [
-           {"params": sorted(list(decay))},
-           {"params": sorted(list(no_decay)), "weight_decay": 0.0},
-       ]
+    def get_parameter_group_specs(self, dense_lr=None, dense_weight_decay=None):
+        """
+        Same as original, but adds a third param group for DenseFormer weights.
+        """
+
+        decay = set()
+        no_decay = set()
+        dense = set()   # <--- NEW
+
+        whitelist_weight_modules = (torch.nn.Linear, )
+        blacklist_weight_modules = (torch.nn.LayerNorm, LayerNorm, torch.nn.Embedding)
+
+        for mn, m in self.named_modules():
+            for pn, p in m.named_parameters():
+                fpn = '%s.%s' % (mn, pn) if mn else pn
+
+                # ---------- NEW: detect DenseFormer weights ----------
+                if fpn.startswith("weights.") and pn == "weight":
+                    dense.add(fpn)
+                    continue  # don't let them fall into other groups
+                # ------------------------------------------------------
+
+                if pn.endswith('bias'):
+                    no_decay.add(fpn)
+                elif pn.endswith('weight') and isinstance(m, whitelist_weight_modules):
+                    decay.add(fpn)
+                elif pn.endswith('weight') and isinstance(m, blacklist_weight_modules):
+                    no_decay.add(fpn)
+
+        # Remove tied weights edge-case
+        if 'lm_head.weight' in decay:
+            decay.remove('lm_head.weight')
+
+        # Validate grouping
+        param_dict = {pn: p for pn, p in self.named_parameters()}
+        all_groups = decay | no_decay | dense
+        assert len(param_dict.keys() - all_groups) == 0, \
+            f"Unassigned params: {param_dict.keys() - all_groups}"
+
+        # ---------- NEW DenseFormer hyperparams ----------
+        dense_group = {
+            "params": sorted(list(dense)),
+        }
+        if dense_lr is not None:
+            dense_group["lr"] = dense_lr
+        if dense_weight_decay is not None:
+            dense_group["weight_decay"] = dense_weight_decay
+        # --------------------------------------------------
+
+        # Return 3 groups
+        return [
+            {"params": sorted(list(decay))},                    # normal weight decay
+            {"params": sorted(list(no_decay)), "weight_decay": 0.0},  # biases, norms
+            dense_group                                         # <--- NEW GROUP
+        ]
 
     @torch.no_grad()
     def generate(self, idx, max_new_tokens, temperature=1.0, top_k=None):
