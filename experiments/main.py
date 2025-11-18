@@ -159,10 +159,6 @@ def main(args):
         g["lr"] = desired
         g["initial_lr"] = desired
 
-    # Ensure schedulers have valid base LR reference
-    for g in opt.param_groups:
-        g.setdefault('initial_lr', args.lr)
-
     # -----------------------
     #  SCHEDULER CREATION
     # -----------------------
@@ -246,9 +242,9 @@ def main(args):
         model.load_state_dict(state_dict, strict=True)
 
         # Restore optimizer + scheduler
-        # if 'optimizer' in checkpoint:
-        #     print("Restoring optimizer state...")
-        #     opt.load_state_dict(checkpoint['optimizer'])
+        if 'optimizer' in checkpoint:
+            print("Restoring optimizer state...")
+            opt.load_state_dict(checkpoint['optimizer'])
         if 'scheduler' in checkpoint and scheduler is not None:
             print("Restoring scheduler state...")
             scheduler.load_state_dict(checkpoint['scheduler'])
