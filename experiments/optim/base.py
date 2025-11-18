@@ -32,77 +32,6 @@ def grad_norm(model):
             total_norm += param_norm.item() ** 2
     return total_norm ** 0.5
 
-def verify_group_lrs(model, opt):
-    """
-    Verify that each param group is actually using the intended LR
-    by checking one real Adam update for one parameter per group.
-    """
-
-    # Pick 3 representative parameters (one from each group)
-    # Adjust names for your actual model
-    test_params = {
-        0: "transformer.h.0.attn.c_attn.weight",   # from "decay" group
-        1: "transformer.h.0.ln_1.weight",          # from "no_decay" group
-        2: "_orig_mod.weights.0.weight",           # from your DenseFormer group
-    }
-
-    # Build dict for fast lookup
-    named = dict(model.named_parameters())
-
-    print("\n============================")
-    print("VERIFY ADAM LRs BY PARAM GROUP")
-    print("============================")
-
-    for group_idx, expected_param_name in test_params.items():
-        print(f"\n[Group {group_idx}] Checking '{expected_param_name}'")
-
-        if expected_param_name not in named:
-            print("  ❌ Parameter name not found in model.state_dict()")
-            continue
-
-        p = named[expected_param_name]
-
-        # Locate which actual optimizer group this param belongs to
-        found_group = None
-        for i, g in enumerate(opt.param_groups):
-            if any(p is q for q in g["params"]):
-                found_group = i
-                group = g
-                break
-
-        if found_group is None:
-            print("  ❌ Parameter not found in any optimizer group.")
-            continue
-
-        lr = group["lr"]
-        print(f"  ✓ Group index = {found_group}")
-        print(f"  ✓ LR in optimizer = {lr}")
-
-        # --- ensure optimizer state exists ---
-        if p not in opt.state or "exp_avg" not in opt.state[p]:
-            print("  ⚠️ Adam state not initialized yet. Need at least one opt.step().")
-            continue
-
-        # Extract state
-        st = opt.state[p]
-        exp_avg = st["exp_avg"]
-        exp_avg_sq = st["exp_avg_sq"]
-        grad = p.grad
-
-        if grad is None:
-            print("  ⚠️ No gradient yet for this parameter.")
-            continue
-
-        # Compute Adam update magnitude
-        denom = exp_avg_sq.sqrt().add_(opt.defaults["eps"])
-        adam_step = exp_avg / denom
-        update_norm = (lr * adam_step).norm()
-
-        print(f"  grad norm         = {grad.norm():.6f}")
-        print(f"  exp_avg norm      = {exp_avg.norm():.6f}")
-        print(f"  exp_avg_sq norm   = {exp_avg_sq.norm():.6f}")
-        print(f"  update step norm  = {update_norm:.6f}")
-
 def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, sequence_length, eval_freq, ckpt_path, distributed_backend, extra_args, srt_iter=0):
     device_type = 'cuda' if 'cuda' in str(extra_args.device) else 'cpu'
     type_ctx = nullcontext() if device_type == 'cpu' else torch.amp.autocast(
@@ -180,7 +109,57 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
 
         opt.step()
 
-        verify_group_lrs(model, opt)
+        test_params = {
+            0: "_orig_mod.transformer.h.0.attn.c_attn.weight",
+            1: "_orig_mod.transformer.h.0.ln_1.weight",
+            2: "_orig_mod.weights.0.weight",
+        }
+
+        named = dict(model.named_parameters())
+
+        print("\n============================")
+        print("VERIFY ADAM LRs BY PARAM GROUP")
+        print("============================")
+
+        for group_idx, param_name in test_params.items():
+            print(f"\n[Group {group_idx}] Checking '{param_name}'")
+
+            if param_name not in named:
+                print("  ❌ Parameter name not found in model.state_dict()")
+                continue
+
+            p = named[param_name]
+
+            # Find optimizer group
+            group = None
+            for i, g in enumerate(opt.param_groups):
+                if any(p is q for q in g["params"]):
+                    group = g
+                    print(f"  ✓ Group index = {i}")
+                    print(f"  ✓ LR in optimizer = {g['lr']}")
+                    break
+
+            if group is None:
+                print("  ❌ Not found in optimizer param groups")
+                continue
+
+            # Check state if available
+            if p not in opt.state or "exp_avg" not in opt.state[p]:
+                print("  ⚠️ Adam state not initialized yet (need first opt.step())")
+                continue
+
+            st = opt.state[p]
+            grad = p.grad
+            exp_avg = st["exp_avg"]
+            exp_avg_sq = st["exp_avg_sq"]
+
+            denom = exp_avg_sq.sqrt().add_(opt.defaults["eps"])
+            adam_step = exp_avg / denom
+
+            print(f"  grad norm         = {grad.norm():.6f}")
+            print(f"  exp_avg norm      = {exp_avg.norm():.6f}")
+            print(f"  exp_avg_sq norm   = {exp_avg_sq.norm():.6f}")
+            print(f"  update step norm  = {(group['lr'] * adam_step).norm():.6f}")
 
         if hasattr(scheduler, 'total_steps'):
             max_steps = scheduler.total_steps
