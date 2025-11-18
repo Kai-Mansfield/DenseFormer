@@ -100,21 +100,21 @@ def main(args):
     param_name_mapping = {p_name: p for p_name, p in model.named_parameters()}
     optimized_params_cnt = 0
 
-    param_dict = dict(model.named_parameters())
+    # param_dict = dict(model.named_parameters())
 
-    for i, g in enumerate(group_specs):
-        print(f"\n=== Param Group {i} ===")
+    # for i, g in enumerate(group_specs):
+    #     print(f"\n=== Param Group {i} ===")
 
-        # Print all hyperparameters except params list
-        for k, v in g.items():
-            if k != "params":
-                print(f"  {k}: {v}")
+    #     # Print all hyperparameters except params list
+    #     for k, v in g.items():
+    #         if k != "params":
+    #             print(f"  {k}: {v}")
 
-        print("  parameters:")
+    #     print("  parameters:")
 
-        for pname in g["params"]:
-            p = param_dict[pname]        # <-- convert name -> tensor
-            print(f"    - {pname} (shape={tuple(p.shape)})")
+    #     for pname in g["params"]:
+    #         p = param_dict[pname]        # <-- convert name -> tensor
+    #         print(f"    - {pname} (shape={tuple(p.shape)})")
 
     for g in group_specs:
         if "lr" not in g:
@@ -265,42 +265,19 @@ def main(args):
         #         scheduler.base_lrs = [args.lr for _ in scheduler.base_lrs]
         #         scheduler.step(scheduler.last_epoch)  # resync internal state
 
-        # Restore RNG states for deterministic continuation
-        if 'rng_state' in checkpoint:
-            state = checkpoint['rng_state']
-            if state.is_cuda:
-                state = state.cpu()
-            torch.set_rng_state(state if isinstance(state, torch.ByteTensor) else torch.ByteTensor(state))
-
-        if 'cuda_rng_state' in checkpoint:
-            # ensure all are CPU ByteTensors
-            cuda_state = []
-            for s in checkpoint['cuda_rng_state']:
-                s_cpu = s.cpu() if s.is_cuda else s
-                if not isinstance(s_cpu, torch.ByteTensor):
-                    s_cpu = torch.ByteTensor(s_cpu)
-                cuda_state.append(s_cpu)
-            torch.cuda.set_rng_state_all(cuda_state)
-
-        if 'numpy_rng_state' in checkpoint:
-            np.random.set_state(checkpoint['numpy_rng_state'])
-
-        if 'python_rng_state' in checkpoint:
-            random.setstate(checkpoint['python_rng_state'])
-
         resume_iter = checkpoint.get('itr', 0)
         print(f"Resuming training from iteration {resume_iter}")
 
-    for i, group in enumerate(opt.param_groups):
-        print(f"Param group {i}:")
-        for k, v in group.items():
-            if k != "params":
-                print(f"  {k}: {v}")
-        for j, p in enumerate(group['params']):
-            if p is not None:
-                # Print parameter name if available
-                name = next((n for n, param in model.named_parameters() if param is p), None)
-                print(f"    param {j}: {name}, shape: {p.shape}, requires_grad: {p.requires_grad}")
+    # for i, group in enumerate(opt.param_groups):
+    #     print(f"Param group {i}:")
+    #     for k, v in group.items():
+    #         if k != "params":
+    #             print(f"  {k}: {v}")
+    #     for j, p in enumerate(group['params']):
+    #         if p is not None:
+    #             # Print parameter name if available
+    #             name = next((n for n, param in model.named_parameters() if param is p), None)
+    #             print(f"    param {j}: {name}, shape: {p.shape}, requires_grad: {p.requires_grad}")
 
     args.world_size = distributed_backend.get_world_size()
     exp_name = args.exp_name
