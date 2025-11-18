@@ -104,20 +104,26 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
                 print("[DEBUG] optimizer exp_avg_sq mean:", v['exp_avg_sq'].mean().item())
             break
 
-        # Pick a denseformer param for verification
+        # pick parameter
         param_name_to_test = "_orig_mod.weights.0.weight"
 
         for i, group in enumerate(opt.param_groups):
             for p in group["params"]:
                 name = next((n for n, par in model.named_parameters() if par is p), None)
-                if name == param_name_to_test:
-                    lr = group["lr"]
 
+                if name == param_name_to_test:
+
+                    # Skip before first optimizer step
+                    if p not in opt.state or "exp_avg" not in opt.state[p]:
+                        print(f"[CHECK] State not initialized yet for {name}. "
+                            f"Run at least one optimizer.step() first.")
+                        continue
+
+                    lr = group["lr"]
                     exp_avg = opt.state[p]["exp_avg"]
                     exp_avg_sq = opt.state[p]["exp_avg_sq"]
                     grad = p.grad
 
-                    # Compute Adam step (no weight decay term for simplicity)
                     denom = (exp_avg_sq.sqrt() + opt.defaults["eps"])
                     adam_step = (exp_avg / denom)
 
