@@ -21,6 +21,7 @@ import time
 import copy
 import traceback
 import sys
+import math
 
 from .utils import eval, get_batch, save_checkpoint
 
@@ -31,6 +32,120 @@ def grad_norm(model):
             param_norm = p.grad.data.norm(2)
             total_norm += param_norm.item() ** 2
     return total_norm ** 0.5
+
+def verify_group_lrs_and_updates(model, opt, max_items=1):
+    """
+    For each optimizer param_group, pick up to `max_items` params that actually belong
+    to that group (auto-detected), then report lr, initial_lr, and Adam internal stats.
+    Call this AFTER at least one backward+opt.step() so optimizer state exists.
+    """
+
+    named = dict(model.named_parameters())   # map name -> tensor
+
+    # Build reverse map for fast identity lookup: tensor -> name
+    tensor_to_name = {param: name for name, param in named.items()}
+
+    print("\n=== VERIFY PER-GROUP LR & UPDATE (auto-detected) ===")
+
+    for gi, g in enumerate(opt.param_groups):
+        print(f"\n--- Group {gi} ---")
+        # print hyperparams
+        for k, v in g.items():
+            if k == "params": 
+                continue
+            print(f"  {k}: {v}")
+
+        # Find up to max_items parameters that belong to this group
+        found = []
+        for candidate in g["params"]:
+            # candidate may be a tensor or name; ensure we compare by identity
+            # find a matching named parameter by identity
+            name = None
+            # fast-path: if candidate is a tensor that appears in named params
+            if candidate in tensor_to_name:
+                name = tensor_to_name[candidate]
+                p = candidate
+            else:
+                # sometimes group["params"] contains names (strings) — handle that
+                if isinstance(candidate, str) and candidate in named:
+                    name = candidate
+                    p = named[candidate]
+                else:
+                    # fallback: try to find by identity via iteration (safe but slower)
+                    # (this avoids elementwise comparison that causes shape errors)
+                    p = None
+                    for n, param in model.named_parameters():
+                        if candidate is param:
+                            name = n
+                            p = param
+                            break
+
+            if name is None:
+                # skip if we couldn't resolve identity
+                continue
+
+            found.append((name, p))
+            if len(found) >= max_items:
+                break
+
+        if not found:
+            print("  ❌ No resolved params found in this group (unexpected).")
+            continue
+
+        for name, p in found:
+            print(f"  param: {name} shape={tuple(p.shape)}")
+
+            # locate optimizer state for this param — use identity-safe key
+            if p not in opt.state or "exp_avg" not in opt.state[p]:
+                print("    ⚠️ optimizer state not initialized for this param. Run at least one step.")
+                continue
+
+            st = opt.state[p]
+            grad = p.grad
+
+            if grad is None:
+                print("    ⚠️ grad is None for this param (maybe not used this step).")
+                continue
+
+            # check for NaN / Inf
+            grad_finite = torch.isfinite(grad).all().item()
+            if not grad_finite:
+                print("    ❌ grad contains NaN/Inf")
+                # print a small subset diagnostic
+                print("    grad stats: min, max, mean =",
+                      float(torch.nanmin(grad)), float(torch.nanmax(grad)), float(torch.nanmean(grad)))
+                continue
+
+            exp_avg = st.get("exp_avg", None)
+            exp_avg_sq = st.get("exp_avg_sq", None)
+            if exp_avg is None or exp_avg_sq is None:
+                print("    ⚠️ missing exp_avg/exp_avg_sq in optimizer state.")
+                continue
+
+            # compute Adam-style step magnitude (matching fused/unfused's math approximately)
+            eps = opt.defaults.get("eps", 1e-8)
+            denom = exp_avg_sq.sqrt().add(eps)   # keep non-inplace
+            adam_step = exp_avg / denom
+            lr = g.get("lr", None)
+            initial_lr = g.get("initial_lr", None)
+
+            # safe norms
+            try:
+                grad_norm = float(grad.norm().item())
+                exp_avg_norm = float(exp_avg.norm().item())
+                exp_avg_sq_norm = float(exp_avg_sq.norm().item())
+                update_norm = float((adam_step * (lr if lr is not None else 1.0)).norm().item())
+            except Exception as e:
+                print("    ❌ Error computing norms:", e)
+                continue
+
+            print(f"    lr = {lr}, initial_lr = {initial_lr}")
+            print(f"    grad norm       = {grad_norm:.6e}")
+            print(f"    exp_avg norm    = {exp_avg_norm:.6e}")
+            print(f"    exp_avg_sq norm = {exp_avg_sq_norm:.6e}")
+            print(f"    computed update norm (lr * adam_step) = {update_norm:.6e}")
+
+    print("=== END VERIFY ===\n")
 
 def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, sequence_length, eval_freq, ckpt_path, distributed_backend, extra_args, srt_iter=0):
     device_type = 'cuda' if 'cuda' in str(extra_args.device) else 'cpu'
@@ -109,61 +224,7 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
 
         opt.step()
 
-        print("\n=== Model.named_parameters() ===")
-        for name, p in model.named_parameters():
-            print(name, p.shape)
-
-        test_params = {
-            0: "_orig_mod.transformer.h.0.attn.c_attn.weight",
-            1: "_orig_mod.transformer.h.0.ln_1.weight",
-            2: "_orig_mod.weights.0.weight",
-        }
-
-        named = dict(model.named_parameters())
-
-        print("\n============================")
-        print("VERIFY ADAM LRs BY PARAM GROUP")
-        print("============================")
-
-        for group_idx, param_name in test_params.items():
-            print(f"\n[Group {group_idx}] Checking '{param_name}'")
-
-            if param_name not in named:
-                print("  ❌ Parameter name not found in model.state_dict()")
-                continue
-
-            p = named[param_name]
-
-            # Find optimizer group
-            group = None
-            for i, g in enumerate(opt.param_groups):
-                if any(p is q for q in g["params"]):
-                    group = g
-                    print(f"  ✓ Group index = {i}")
-                    print(f"  ✓ LR in optimizer = {g['lr']}")
-                    break
-
-            if group is None:
-                print("  ❌ Not found in optimizer param groups")
-                continue
-
-            # Check state if available
-            if p not in opt.state or "exp_avg" not in opt.state[p]:
-                print("  ⚠️ Adam state not initialized yet (need first opt.step())")
-                continue
-
-            st = opt.state[p]
-            grad = p.grad
-            exp_avg = st["exp_avg"]
-            exp_avg_sq = st["exp_avg_sq"]
-
-            denom = exp_avg_sq.sqrt().add_(opt.defaults["eps"])
-            adam_step = exp_avg / denom
-
-            print(f"  grad norm         = {grad.norm():.6f}")
-            print(f"  exp_avg norm      = {exp_avg.norm():.6f}")
-            print(f"  exp_avg_sq norm   = {exp_avg_sq.norm():.6f}")
-            print(f"  update step norm  = {(group['lr'] * adam_step).norm():.6f}")
+        verify_group_lrs_and_updates(model, opt)
 
         if hasattr(scheduler, 'total_steps'):
             max_steps = scheduler.total_steps
