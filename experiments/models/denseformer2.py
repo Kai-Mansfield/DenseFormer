@@ -400,53 +400,59 @@ class DenseFormer2(nn.Module):
 
         decay = set()
         no_decay = set()
-        dense = set()   # <--- NEW
+        dense = set()
 
-        whitelist_weight_modules = (torch.nn.Linear, )
+        whitelist_weight_modules = (torch.nn.Linear,)
         blacklist_weight_modules = (torch.nn.LayerNorm, LayerNorm, torch.nn.Embedding)
 
+        # Collect group membership by name
         for mn, m in self.named_modules():
             for pn, p in m.named_parameters():
-                fpn = '%s.%s' % (mn, pn) if mn else pn
+                fpn = f"{mn}.{pn}" if mn else pn
 
-                # ---------- NEW: detect DenseFormer weights ----------
+                # --------- DenseFormer group detection ---------
                 if fpn.startswith("weights.") and pn == "weight":
                     dense.add(fpn)
-                    continue  # don't let them fall into other groups
-                # ------------------------------------------------------
+                    continue
+                # ------------------------------------------------
 
-                if pn.endswith('bias'):
+                if pn.endswith("bias"):
                     no_decay.add(fpn)
-                elif pn.endswith('weight') and isinstance(m, whitelist_weight_modules):
+                elif pn.endswith("weight") and isinstance(m, whitelist_weight_modules):
                     decay.add(fpn)
-                elif pn.endswith('weight') and isinstance(m, blacklist_weight_modules):
+                elif pn.endswith("weight") and isinstance(m, blacklist_weight_modules):
                     no_decay.add(fpn)
 
-        # Remove tied weights edge-case
-        if 'lm_head.weight' in decay:
-            decay.remove('lm_head.weight')
+        # Remove tied weights if present
+        if "lm_head.weight" in decay:
+            decay.remove("lm_head.weight")
 
-        # Validate grouping
+        # Map names → tensors
         param_dict = {pn: p for pn, p in self.named_parameters()}
+
+        # Ensure no param is unassigned
         all_groups = decay | no_decay | dense
         assert len(param_dict.keys() - all_groups) == 0, \
             f"Unassigned params: {param_dict.keys() - all_groups}"
 
-        # ---------- NEW DenseFormer hyperparams ----------
-        dense_group = {
-            "params": sorted(list(dense)),
-        }
+        # -------- Convert names → actual tensor params --------
+        decay_params = [param_dict[n] for n in sorted(list(decay))]
+        no_decay_params = [param_dict[n] for n in sorted(list(no_decay))]
+        dense_params = [param_dict[n] for n in sorted(list(dense))]
+        # -------------------------------------------------------
+
+        # ---------- DenseFormer hyperparams ----------
+        dense_group = {"params": dense_params}
         if dense_lr is not None:
             dense_group["lr"] = dense_lr
         if dense_weight_decay is not None:
             dense_group["weight_decay"] = dense_weight_decay
-        # --------------------------------------------------
+        # ---------------------------------------------
 
-        # Return 3 groups
         return [
-            {"params": sorted(list(decay))},                    # normal weight decay
-            {"params": sorted(list(no_decay)), "weight_decay": 0.0},  # biases, norms
-            dense_group                                         # <--- NEW GROUP
+            {"params": decay_params},                              # normal weights
+            {"params": no_decay_params, "weight_decay": 0.0},      # norms + bias
+            dense_group                                            # DenseFormer
         ]
 
     @torch.no_grad()
