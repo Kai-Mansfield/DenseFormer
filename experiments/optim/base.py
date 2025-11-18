@@ -109,6 +109,10 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
 
         opt.step()
 
+        print("\n=== Model.named_parameters() ===")
+        for name, p in model.named_parameters():
+            print(name, p.shape)
+
         test_params = {
             0: "_orig_mod.transformer.h.0.attn.c_attn.weight",
             1: "_orig_mod.transformer.h.0.ln_1.weight",
