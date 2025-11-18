@@ -99,21 +99,21 @@ def main(args):
     group_specs = distributed_backend.get_raw_model(model).get_parameter_group_specs(dense_lr=.1 * args.lr, dense_weight_decay=args.weight_decay)
     param_name_mapping = {p_name: p for p_name, p in model.named_parameters()}
     optimized_params_cnt = 0
+    param_dict = dict(model.named_parameters())
+
     for i, g in enumerate(group_specs):
         print(f"\n=== Param Group {i} ===")
 
-        # Print all group hyperparameters except the params list
+        # Print all hyperparameters except params list
         for k, v in g.items():
-            if k == "params":
-                continue
-            print(f"  {k}: {v}")
+            if k != "params":
+                print(f"  {k}: {v}")
 
-        # Print parameter names inside the group
         print("  parameters:")
-        for p in g["params"]:
-            # find name
-            name = next((n for n, param in model.named_parameters() if param is p), "<unnamed>")
-            print(f"    - {name} (shape={tuple(p.shape)})")
+
+        for pname in g["params"]:
+            p = param_dict[pname]        # <-- convert name -> tensor
+            print(f"    - {pname} (shape={tuple(p.shape)})")
     for g in group_specs:
         params = []
         for p_name in g["params"]:
