@@ -99,6 +99,7 @@ def main(args):
     group_specs = distributed_backend.get_raw_model(model).get_parameter_group_specs(dense_lr=.1 * args.lr, dense_weight_decay=args.weight_decay)
     param_name_mapping = {p_name: p for p_name, p in model.named_parameters()}
     optimized_params_cnt = 0
+
     param_dict = dict(model.named_parameters())
 
     for i, g in enumerate(group_specs):
@@ -114,7 +115,10 @@ def main(args):
         for pname in g["params"]:
             p = param_dict[pname]        # <-- convert name -> tensor
             print(f"    - {pname} (shape={tuple(p.shape)})")
+
     for g in group_specs:
+        if "lr" not in g:
+            g["lr"] = args.lr
         params = []
         for p_name in g["params"]:
             translated_p_names = distributed_backend.translate_model_parameter_name_for_node(p_name)
