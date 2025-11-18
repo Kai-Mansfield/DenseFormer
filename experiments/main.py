@@ -100,6 +100,20 @@ def main(args):
     param_name_mapping = {p_name: p for p_name, p in model.named_parameters()}
     optimized_params_cnt = 0
 
+    for g in group_specs:
+        if "lr" not in g:
+            g["lr"] = args.lr
+        params = []
+        for p_name in g["params"]:
+            translated_p_names = distributed_backend.translate_model_parameter_name_for_node(p_name)
+            if p_name in param_name_mapping:
+                params += [param_name_mapping[p_name] for p_name in translated_p_names]
+            else:
+                print(f"Skipping tied or missing param: {p_name}")
+        g["params"] = params
+        optimized_params_cnt += sum([p.numel() for p in g["params"]])
+    print("number of optimized parameters: %.2fM" % (optimized_params_cnt / 1e6))
+
     param_dict = dict(model.named_parameters())
 
     for i, g in enumerate(group_specs):
@@ -115,20 +129,6 @@ def main(args):
         for pname in g["params"]:
             p = param_dict[pname]        # <-- convert name -> tensor
             print(f"    - {pname} (shape={tuple(p.shape)})")
-
-    for g in group_specs:
-        if "lr" not in g:
-            g["lr"] = args.lr
-        params = []
-        for p_name in g["params"]:
-            translated_p_names = distributed_backend.translate_model_parameter_name_for_node(p_name)
-            if p_name in param_name_mapping:
-                params += [param_name_mapping[p_name] for p_name in translated_p_names]
-            else:
-                print(f"Skipping tied or missing param: {p_name}")
-        g["params"] = params
-        optimized_params_cnt += sum([p.numel() for p in g["params"]])
-    print("number of optimized parameters: %.2fM" % (optimized_params_cnt / 1e6))
 
     # -----------------------
     #  OPTIMIZER CREATION
