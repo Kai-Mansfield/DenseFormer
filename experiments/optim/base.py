@@ -156,6 +156,9 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
     stats = {'train_loss': [], 'val_loss': [], 'val_pp': [], 'val_acc': []}
 
     num_substeps_per_epoch = len(data['train']) // (batch_size * sequence_length)
+
+    running_layer_grad_sum = {}
+    running_layer_grad_count = {}
     
     if not extra_args.no_compile:
         print(f"Compiling model ...")
@@ -189,12 +192,16 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
 
             loss = outputs['loss']
             loss.backward()
-            # print("grad check:")
-            # for name, p in model.named_parameters():
-            #     if p.grad is None:
-            #         print("  NONE:", name)
-            #     elif torch.all(p.grad == 0):
-            #         print("  ZERO:", name)
+            for name, p in model.named_parameters():
+                if p.grad is not None:
+                    g = p.grad.data.norm().item()
+
+                    if name not in running_layer_grad_sum:
+                        running_layer_grad_sum[name] = 0.0
+                        running_layer_grad_count[name] = 0
+
+                    running_layer_grad_sum[name] += g
+                    running_layer_grad_count[name] += 1
             substep += 1
 
         # ---- RAW GRAD NORM BEFORE CLIPPING ----
@@ -269,6 +276,30 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
                 )
 
                 print(print_string)
+
+                # ---- Compute per-layer average grad norms ----
+                layer_grad_avgs = {
+                    name: running_layer_grad_sum[name] / running_layer_grad_count[name]
+                    for name in running_layer_grad_sum
+                }
+
+                # ---- Sort by gradient magnitude (descending) ----
+                sorted_layers = sorted(
+                    layer_grad_avgs.items(),
+                    key=lambda x: x[1],
+                    reverse=True
+                )
+
+                # ---- Write all averages to file ----
+                output_path = f"{ckpt_path}/{extra_args.ckpt_name}_layer_grads.txt"
+                with open(output_path, "a") as f:
+                    f.write(f"\n--- Iteration {itr} ---\n")
+                    for name, avg in sorted_layers:
+                        f.write(f"{name}: {avg:.6e}\n")
+
+                # ---- Reset accumulators for the next interval ----
+                running_layer_grad_sum.clear()
+                running_layer_grad_count.clear()
 
                 if extra_args.wandb:
                     wandb.log({
