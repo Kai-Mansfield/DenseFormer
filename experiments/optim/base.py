@@ -254,16 +254,20 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
 
                 model.eval()
                 train_loss = loss.detach().cpu().item()
-                current_lr = scheduler.get_last_lr()[0] if scheduler is not None else extra_args.lr
+                group_lrs = [g["lr"] for g in opt.param_groups]
                 val_acc, val_loss, val_perplexity = eval(model, data['val'], sequence_length, batch_size,
                                                          extra_args.device, max_num_batches=24, ctx=type_ctx)
                 test_acc, test_loss, test_perplexity = eval(model, data['test'], sequence_length, batch_size,
                                                          extra_args.device, max_num_batches=24, ctx=type_ctx)
 
-                print_string = f"{epoch}/{itr} [train] loss={train_loss:.3f} [val] loss={val_loss:.3f}, [test] loss={test_loss:.3f}"
-                print_string += f" [time per itr] {dt*1000/eval_freq:.2f}ms"
-                if scheduler is not None:
-                    print_string += f" [lr] {current_lr:.7f}"
+                print_string = (
+                    f"{epoch}/{itr} [train] loss={train_loss:.3f}"
+                    f" [val] loss={val_loss:.3f}"
+                    f" [test] loss={test_loss:.3f}"
+                    f" [time per itr] {dt*1000/eval_freq:.2f}ms"
+                    f" [lr0] {group_lrs[0]:.7f} [lr1] {group_lrs[1]:.7f} [lr2] {group_lrs[2]:.7f}"
+                )
+
                 print(print_string)
 
                 if extra_args.wandb:
