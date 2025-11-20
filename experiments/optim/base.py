@@ -249,7 +249,7 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
                 with open(output_path, "a") as f:
                     f.write(f"\n--- Iteration {itr} ---\n")
                     for name, grad in layer_grads:
-                        f.write(f"{name}: {avg:.6e}\n")
+                        f.write(f"{name}: {grad:.6e}\n")
 
                 # ---- Reset accumulators for the next interval ----
                 running_layer_grad_sum.clear()
