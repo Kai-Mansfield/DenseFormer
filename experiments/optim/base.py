@@ -192,52 +192,19 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
 
             loss = outputs['loss']
             loss.backward()
-            for name, p in model.named_parameters():
-                if p.grad is not None:
-                    g = p.grad.data.norm().item()
-
-                    if name not in running_layer_grad_sum:
-                        running_layer_grad_sum[name] = 0.0
-                        running_layer_grad_count[name] = 0
-
-                    running_layer_grad_sum[name] += g
-                    running_layer_grad_count[name] += 1
             substep += 1
 
-        # ---- RAW GRAD NORM BEFORE CLIPPING ----
-        # total_norm = 0.0
-        # for p in model.parameters():
-        #     if p.grad is not None:
-        #         param_norm = p.grad.data.norm(2)
-        #         total_norm += param_norm.item() ** 2
-        # total_norm = (total_norm ** 0.5)
-
-        # print(f"[DEBUG] raw_grad_norm={total_norm:.4f}, loss={loss.item():.5f}")
-
         # # ---- TOP LAYERS ----
-        # layer_grads = []
-        # for name, p in model.named_parameters():
-        #     if p.grad is not None:
-        #         layer_grads.append((name, p.grad.data.norm().item()))
-        # layer_grads = sorted(layer_grads, key=lambda x: x[1], reverse=True)
-
-        # print("[DEBUG] top gradient layers:")
-        # for name, g in layer_grads:
-        #     print(f"  {name:60s} {g:.4f}")
-
-        # # ---- OPTIMIZER BUFFERS (Adam) ----
-        # for k, v in opt.state.items():
-        #     if 'exp_avg' in v:
-        #         print("[DEBUG] optimizer exp_avg norm:", v['exp_avg'].norm().item())
-        #         print("[DEBUG] optimizer exp_avg_sq mean:", v['exp_avg_sq'].mean().item())
-        #     break
+        layer_grads = []
+        for name, p in model.named_parameters():
+            if p.grad is not None:
+                layer_grads.append((name, p.grad.data.norm().item()))
+        layer_grads = sorted(layer_grads, key=lambda x: x[1], reverse=True)
 
         if extra_args.grad_clip != 0.0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), extra_args.grad_clip)
 
         opt.step()
-
-        # verify_group_lrs_and_updates(model, opt)
 
         if hasattr(scheduler, 'total_steps'):
             max_steps = scheduler.total_steps
@@ -277,24 +244,11 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
 
                 print(print_string)
 
-                # ---- Compute per-layer average grad norms ----
-                layer_grad_avgs = {
-                    name: running_layer_grad_sum[name] / running_layer_grad_count[name]
-                    for name in running_layer_grad_sum
-                }
-
-                # ---- Sort by gradient magnitude (descending) ----
-                sorted_layers = sorted(
-                    layer_grad_avgs.items(),
-                    key=lambda x: x[1],
-                    reverse=True
-                )
-
                 # ---- Write all averages to file ----
                 output_path = f"{ckpt_path}/{extra_args.ckpt_name}_layer_grads.txt"
                 with open(output_path, "a") as f:
                     f.write(f"\n--- Iteration {itr} ---\n")
-                    for name, avg in sorted_layers:
+                    for name, grad in layer_grads:
                         f.write(f"{name}: {avg:.6e}\n")
 
                 # ---- Reset accumulators for the next interval ----
