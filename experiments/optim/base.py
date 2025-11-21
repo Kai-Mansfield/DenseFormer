@@ -201,39 +201,32 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
                 layer_grads.append((name, p.grad.data.norm().item()))
         layer_grads = sorted(layer_grads, key=lambda x: x[1], reverse=True)
 
-        # ---- EXTRA: per-parameter (elementwise) max gradient with full name ----
-        max_elementwise_grad = []   # (full_name, max_val)
+        print("\n=== Layer grads + max elementwise grads ===")
 
         named_params = dict(model.named_parameters())
 
-        for name, _ in layer_grads:   # use your existing layer_grads ordering
+        for name, layer_norm in layer_grads:    # iterate in SAME order
             p = named_params[name]
 
             if p.grad is None:
+                print(f"{name} {layer_norm:.6e} [NO_GRAD]")
                 continue
 
-            # absolute gradient per element
             abs_grad = p.grad.detach().abs()
 
-            # maximum gradient value
+            # max elementwise grad
             max_val = abs_grad.max().item()
 
-            # index where maximum occurred
+            # index of max
             argmax_flat = abs_grad.argmax()
             multi_idx = torch.unravel_index(argmax_flat, abs_grad.shape)
 
-            # convert tensor indices -> python ints
+            # convert tensor -> python ints
             idx_list = [int(i) for i in multi_idx]
-
-            # build readable name
             idx_string = "".join(f"[{i}]" for i in idx_list)
-            full_param_name = f"{name}{idx_string}"
 
-            max_elementwise_grad.append((full_param_name, max_val))
-
-        print("\n=== Top 5 individual gradient elements ===")
-        for full_name, max_val in sorted(max_elementwise_grad, key=lambda x: x[1], reverse=True)[:5]:
-            print(f"{full_name}: {max_val:.6e}")
+            # print on one line
+            print(f"{name} layer_grad={layer_norm:.6e}  max_elem={idx_string}  elem_grad={max_val:.6e}")
 
         if extra_args.grad_clip != 0.0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), extra_args.grad_clip)
