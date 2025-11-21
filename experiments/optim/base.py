@@ -201,7 +201,7 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
                 layer_grads.append((name, p.grad.data.norm().item()))
         layer_grads = sorted(layer_grads, key=lambda x: x[1], reverse=True)
 
-        # ---- Immediately compute and store max elementwise grad BEFORE zero_grad ----
+        named_params = dict(model.named_parameters())
         elemwise_info = {}  # store per-layer (idx_string, max_val)
 
         for name, grad in layer_grads:
