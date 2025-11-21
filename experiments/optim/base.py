@@ -201,26 +201,34 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
                 layer_grads.append((name, p.grad.data.norm().item()))
         layer_grads = sorted(layer_grads, key=lambda x: x[1], reverse=True)
 
-        # ---- EXTRA: per-parameter max elementwise gradient ----
-        max_elementwise_grad = []   # (name, max_val, max_idx)
+        # ---- EXTRA: per-parameter (elementwise) max gradient with full name ----
+        max_elementwise_grad = []   # (full_name, max_val)
 
-        for name, _ in layer_grads:        # use your existing sorted layer list
+        for name, _ in layer_grads:        # iterate using your existing sorted layers
             p = dict(model.named_parameters())[name]
 
             if p.grad is None:
                 continue
 
+            # absolute gradient per element
             abs_grad = p.grad.detach().abs()
 
+            # get maximum gradient value
             max_val = abs_grad.max().item()
-            max_idx = torch.unravel_index(abs_grad.argmax(), abs_grad.shape)
 
-            max_elementwise_grad.append((name, max_val, tuple(max_idx)))
+            # get index where maximum occurred
+            flat_idx = abs_grad.argmax().item()
+            multi_idx = torch.unravel_index(abs_grad.argmax(), abs_grad.shape)
 
-        # Example: print top 5 layers with the largest individual element gradient
+            # construct a readable “full name”
+            idx_string = "[" + "][".join(str(i) for i in multi_idx) + "]"
+            full_param_name = f"{name}{idx_string}"
+
+            max_elementwise_grad.append((full_param_name, max_val))
+
         print("\n=== Top 5 individual gradient elements ===")
-        for name, max_val, idx in sorted(max_elementwise_grad, key=lambda x: x[1], reverse=True)[:5]:
-            print(f"{name}: max_grad={max_val:.6e} at index {idx}")
+        for full_name, max_val in sorted(max_elementwise_grad, key=lambda x: x[1], reverse=True)[:5]:
+            print(f"{full_name}: {max_val:.6e}")
 
         if extra_args.grad_clip != 0.0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), extra_args.grad_clip)
