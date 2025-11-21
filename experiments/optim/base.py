@@ -201,6 +201,27 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
                 layer_grads.append((name, p.grad.data.norm().item()))
         layer_grads = sorted(layer_grads, key=lambda x: x[1], reverse=True)
 
+        # ---- EXTRA: per-parameter max elementwise gradient ----
+        max_elementwise_grad = []   # (name, max_val, max_idx)
+
+        for name, _ in layer_grads:        # use your existing sorted layer list
+            p = dict(model.named_parameters())[name]
+
+            if p.grad is None:
+                continue
+
+            abs_grad = p.grad.detach().abs()
+
+            max_val = abs_grad.max().item()
+            max_idx = torch.unravel_index(abs_grad.argmax(), abs_grad.shape)
+
+            max_elementwise_grad.append((name, max_val, tuple(max_idx)))
+
+        # Example: print top 5 layers with the largest individual element gradient
+        print("\n=== Top 5 individual gradient elements ===")
+        for name, max_val, idx in sorted(max_elementwise_grad, key=lambda x: x[1], reverse=True)[:5]:
+            print(f"{name}: max_grad={max_val:.6e} at index {idx}")
+
         if extra_args.grad_clip != 0.0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), extra_args.grad_clip)
 
