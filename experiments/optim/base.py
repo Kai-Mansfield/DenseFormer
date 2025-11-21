@@ -201,6 +201,27 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
                 layer_grads.append((name, p.grad.data.norm().item()))
         layer_grads = sorted(layer_grads, key=lambda x: x[1], reverse=True)
 
+        # ---- Immediately compute and store max elementwise grad BEFORE zero_grad ----
+        elemwise_info = {}  # store per-layer (idx_string, max_val)
+
+        for name, grad in layer_grads:
+            p = named_params[name]
+
+            if p.grad is None:
+                elemwise_info[name] = ("NO_GRAD", 0.0)
+                continue
+
+            abs_grad = p.grad.detach().abs()
+            max_val = abs_grad.max().item()
+
+            # index of max
+            argmax_flat = abs_grad.argmax()
+            multi_idx = torch.unravel_index(argmax_flat, abs_grad.shape)
+
+            idx_string = "".join(f"[{int(i)}]" for i in multi_idx)
+
+            elemwise_info[name] = (idx_string, max_val)
+
         if extra_args.grad_clip != 0.0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), extra_args.grad_clip)
 
@@ -244,32 +265,14 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
 
                 print(print_string)
 
-                # ---- Write all grads + max elementwise grads to file ----
+                # ---- Write all grads + stored max elementwise grads to file ----
                 output_path = f"{ckpt_path}/{extra_args.ckpt_name}_layer_grads.txt"
-                named_params = dict(model.named_parameters())
-
                 with open(output_path, "a") as f:
                     f.write(f"\n--- Iteration {itr} ---\n")
 
                     for name, grad in layer_grads:  # same order
-                        p = named_params[name]
+                        idx_string, max_val = elemwise_info[name]
 
-                        if p.grad is None:
-                            f.write(f"{name}: layer_grad={grad:.6e} NO_GRAD\n")
-                            continue
-
-                        # compute max elementwise grad
-                        abs_grad = p.grad.detach().abs()
-                        max_val = abs_grad.max().item()
-
-                        # index of max
-                        argmax_flat = abs_grad.argmax()
-                        multi_idx = torch.unravel_index(argmax_flat, abs_grad.shape)
-
-                        # convert to python ints + build index string: [0][32]...
-                        idx_string = "".join(f"[{int(i)}]" for i in multi_idx)
-
-                        # write line
                         f.write(
                             f"{name}: layer_grad={grad:.6e}  max_elem={idx_string}  elem_grad={max_val:.6e}\n"
                         )
