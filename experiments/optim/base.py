@@ -204,8 +204,10 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
         # ---- EXTRA: per-parameter (elementwise) max gradient with full name ----
         max_elementwise_grad = []   # (full_name, max_val)
 
-        for name, _ in layer_grads:        # iterate using your existing sorted layers
-            p = dict(model.named_parameters())[name]
+        named_params = dict(model.named_parameters())
+
+        for name, _ in layer_grads:   # use your existing layer_grads ordering
+            p = named_params[name]
 
             if p.grad is None:
                 continue
@@ -213,15 +215,18 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
             # absolute gradient per element
             abs_grad = p.grad.detach().abs()
 
-            # get maximum gradient value
+            # maximum gradient value
             max_val = abs_grad.max().item()
 
-            # get index where maximum occurred
-            flat_idx = abs_grad.argmax().item()
-            multi_idx = torch.unravel_index(abs_grad.argmax(), abs_grad.shape)
+            # index where maximum occurred
+            argmax_flat = abs_grad.argmax()
+            multi_idx = torch.unravel_index(argmax_flat, abs_grad.shape)
 
-            # construct a readable “full name”
-            idx_string = "[" + "][".join(str(i) for i in multi_idx) + "]"
+            # convert tensor indices -> python ints
+            idx_list = [int(i) for i in multi_idx]
+
+            # build readable name
+            idx_string = "".join(f"[{i}]" for i in idx_list)
             full_param_name = f"{name}{idx_string}"
 
             max_elementwise_grad.append((full_param_name, max_val))
