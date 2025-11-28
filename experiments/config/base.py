@@ -42,6 +42,7 @@ def parse_args(base_parser, args, namespace):
     parser.add_argument('--iterations', default=15000, type=int)
     parser.add_argument('--start_iter', default=0, type=int)
     parser.add_argument('--lr', default=2e-3, type=float)
+    parser.add_argument('--dlr', default=None, type=float, help='Decayed learning rate; if provided must be float.')
     parser.add_argument('--warmup_percent', default=0.02, type=float)
     parser.add_argument('--weight_decay', default=1e-3, type=float)
     parser.add_argument('--beta1', default=0.9, type=float)

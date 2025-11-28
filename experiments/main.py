@@ -96,25 +96,11 @@ def main(args):
     model = models.make_model_from_args(args)
     model = distributed_backend.transform_model(model)
 
-    group_specs = distributed_backend.get_raw_model(model).get_parameter_group_specs(dense_lr=.1 * args.lr, dense_weight_decay=args.weight_decay)
+    if args.dlr is None:
+        args.dlr = args.lr
+    group_specs = distributed_backend.get_raw_model(model).get_parameter_group_specs(args.dlr, dense_weight_decay=args.weight_decay)
     param_name_mapping = {p_name: p for p_name, p in model.named_parameters()}
     optimized_params_cnt = 0
-
-    # param_dict = dict(model.named_parameters())
-
-    # for i, g in enumerate(group_specs):
-    #     print(f"\n=== Param Group {i} ===")
-
-    #     # Print all hyperparameters except params list
-    #     for k, v in g.items():
-    #         if k != "params":
-    #             print(f"  {k}: {v}")
-
-    #     print("  parameters:")
-
-    #     for pname in g["params"]:
-    #         p = param_dict[pname]        # <-- convert name -> tensor
-    #         print(f"    - {pname} (shape={tuple(p.shape)})")
 
     for g in group_specs:
         if "lr" not in g:
@@ -263,17 +249,6 @@ def main(args):
 
         resume_iter = checkpoint.get('itr', 0)
         print(f"Resuming training from iteration {resume_iter}")
-
-    # for i, group in enumerate(opt.param_groups):
-    #     print(f"Param group {i}:")
-    #     for k, v in group.items():
-    #         if k != "params":
-    #             print(f"  {k}: {v}")
-    #     for j, p in enumerate(group['params']):
-    #         if p is not None:
-    #             # Print parameter name if available
-    #             name = next((n for n, param in model.named_parameters() if param is p), None)
-    #             print(f"    param {j}: {name}, shape: {p.shape}, requires_grad: {p.requires_grad}")
 
     args.world_size = distributed_backend.get_world_size()
     exp_name = args.exp_name
