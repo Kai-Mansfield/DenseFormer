@@ -98,7 +98,7 @@ def main(args):
 
     if args.dlr is None:
         args.dlr = args.lr
-    group_specs = distributed_backend.get_raw_model(model).get_parameter_group_specs(args.dlr, dense_weight_decay=args.weight_decay)
+    group_specs = distributed_backend.get_raw_model(model).get_parameter_group_specs()
     param_name_mapping = {p_name: p for p_name, p in model.named_parameters()}
     optimized_params_cnt = 0
 
