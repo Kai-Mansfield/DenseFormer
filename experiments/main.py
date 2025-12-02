@@ -126,8 +126,8 @@ def main(args):
     print(f"Using fused AdamW: {use_fused}")
 
     for name, p in model.named_parameters():
-    if not p.is_floating_point() or p.device.type != "cuda":
-        print("BAD PARAM:", name, p.dtype, p.device)
+        if not p.is_floating_point() or p.device.type != "cuda":
+            print("BAD PARAM:", name, p.dtype, p.device)
 
     if args.opt == 'adamw':
         extra_args = dict(fused=True) if use_fused else {}
