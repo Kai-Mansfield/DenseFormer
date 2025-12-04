@@ -260,7 +260,8 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
                     f" [val] loss={val_loss:.3f}"
                     # f" [test] loss={test_loss:.3f}"
                     f" [time per itr] {dt*1000/eval_freq:.2f}ms"
-                    f" [lr0] {group_lrs[0]:.7f} [lr1] {group_lrs[1]:.7f} [lr2] {group_lrs[2]:.7f}"
+                    # f" [lr0] {group_lrs[0]:.7f} [lr1] {group_lrs[1]:.7f} [lr2] {group_lrs[2]:.7f}"
+                    f" [lr0] {group_lrs[0]:.7f}"
                 )
 
                 print(print_string)
