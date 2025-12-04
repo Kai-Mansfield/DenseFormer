@@ -24,6 +24,22 @@ from torch.nn import functional as F
 
 from . import positional_encoders, caches
 
+def safe_move(x, device, *, context="forward"):
+    if isinstance(x, torch.nn.Module):
+        return x.to(device)
+    elif isinstance(x, torch.Tensor):
+        if context == "forward":
+            # preserve graph
+            return x.to(device, non_blocking=True)
+        else:
+            # init/checkpoint contexts; no need to detach here either
+            return x.to(device)
+    elif hasattr(x, "encoder"):  # your closure case
+        x.encoder = safe_move(x.encoder, device, context=context)
+        return x
+    else:
+        return x
+
 class InPlaceSetSlice(torch.autograd.Function):
 
     @staticmethod
