@@ -210,6 +210,27 @@ class DenseFormer(nn.Module):
         ])
 
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
+
+        self.transformer["wte"]  = safe_move(self.transformer["wte"], "cuda:0")
+        self.transformer["wpe"] = safe_move(self.transformer["wpe"], "cuda:0")
+        self.transformer["drop"] = safe_move(self.transformer["drop"], "cuda:0")
+        
+        n_layer = config.n_layer
+
+        self.n_cuda0 = max(0, n_layer - 22) 
+
+        # Now move layers
+        for i, block in enumerate(self.transformer["h"]):
+            if i < self.n_cuda0:
+                dev = "cuda:0"
+            else:
+                dev = "cuda:1"
+            self.transformer["h"][i] = safe_move(block, dev)
+            self.weights[i] = safe_move(self.weights[i], dev)
+
+        self.transformer["ln_f"] = safe_move(self.transformer["ln_f"], "cuda:1")
+        self.lm_head = safe_move(self.lm_head, "cuda:0")
+
         # with weight tying when using torch.compile() some warnings get generated:
         # "UserWarning: functional_call was passed multiple values for tied weights.
         # This behavior is deprecated and will be an error in future versions"
@@ -261,13 +282,21 @@ class DenseFormer(nn.Module):
         else:
             index_shift = 0
             cache_context = None
+
         if getattr(self.transformer.wpe, "needs_iter", False):
             idx, pos_emb_closure = self.transformer.wpe(idx, iter=iter) # position embeddings of shape (1, t, n_embd)
         else:
             idx, pos_emb_closure = self.transformer.wpe(idx) # position embeddings of shape (1, t, n_embd)
+
         tok_emb = self.transformer.wte(idx) # token embeddings of shape (b, t, n_embd)
         x = pos_emb_closure.adapt_model_input(tok_emb, start_index=index_shift)
+        if torch.isnan(x).any():
+            print(f"NaNs found after pos_emb_closure.adapt_model_input(tok_emb, start_index=index_shift)")
+
         x = self.transformer.drop(x)
+        if torch.isnan(x).any():
+            print(f"NaNs found after self.transformer.drop(x)")
+
         x_accs = []
         for i in range(self.dilation_factor):
             current_group_size = (self.n_repeat + 1) // self.dilation_factor
@@ -276,6 +305,9 @@ class DenseFormer(nn.Module):
             x_accs.append((torch.zeros((current_group_size, *x.shape), device=x.device, dtype=x.dtype), None))
         x_accs[0] = apply_inplace_set(x_accs[0], 0, x)
         for rep_idx in range(1, self.n_repeat+1):
+            if rep_idx == 1 + self.n_cuda0:
+                x = safe_move(x, "cuda:1")
+                x_accs[rep_idx % self.dilation_factor] = (safe_move(x_accs[rep_idx % self.dilation_factor][0], 'cuda:1'), safe_move(x_accs[rep_idx % self.dilation_factor][1], 'cuda:1'))
             for block in self.transformer.h[rep_idx-1]:
                 x = block(x, pos_emb_closure, cache_context, start_index=index_shift)
             x_accs[rep_idx % self.dilation_factor] = apply_inplace_set(
@@ -290,6 +322,8 @@ class DenseFormer(nn.Module):
 
         if use_cache:
             x = self.lm_cache.get_final_logits(x)
+
+        x = safe_move(x, "cuda:0")
         if targets is not None:
             logits = self.lm_head(x)
             loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
