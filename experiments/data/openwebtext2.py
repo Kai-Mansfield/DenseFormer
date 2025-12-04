@@ -49,6 +49,7 @@ def get_openwebtext2_data(config):
         # === Create train / val / test splits ===
         # First split into (train+val) and test
         split_1 = dataset.train_test_split(test_size=0.0005, shuffle=True, seed=2357)
+        train_dataset = split_1["train"]
         val_dataset = split_1["test"]
 
         # Now split (train+val)
