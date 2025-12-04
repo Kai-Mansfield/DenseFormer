@@ -20,7 +20,7 @@ from datasets import Dataset
 import glob
 import json 
 
-OWT2_DATA_PATH = '/mnt/lustre/users/inf/kajm20/df/openwebtext2-test_split'
+OWT2_DATA_PATH = '/mnt/lustre/users/inf/kajm20/df/openwebtext2'
 tknzr = tiktoken.get_encoding("gpt2")
 
 
@@ -48,15 +48,16 @@ def get_openwebtext2_data(config):
 
         # === Create train / val / test splits ===
         # First split into (train+val) and test
-        split_1 = dataset.train_test_split(test_size=0.0005, shuffle=True)
-        test_dataset = split_1["test"]
+        split_1 = dataset.train_test_split(test_size=0.0005, shuffle=True, seed=2357)
+        test_dataset = split_1["val"]
 
         # Now split (train+val)
-        split_2 = split_1["train"].train_test_split(test_size=0.0005, shuffle=True)
-        train_dataset = split_2["train"]
-        val_dataset = split_2["test"]
+        # split_2 = split_1["train"].train_test_split(test_size=0.0005, shuffle=True)
+        # train_dataset = split_2["train"]
+        # val_dataset = split_2["test"]
 
-        split_dataset = {"train": train_dataset, "val": val_dataset, "test": test_dataset}
+        # split_dataset = {"train": train_dataset, "val": val_dataset, "test": test_dataset}
+        split_dataset = {"train": train_dataset, "val": val_dataset}
 
         def process(example):
             ids = tknzr.encode_ordinary(example['text'])
@@ -92,6 +93,7 @@ def get_openwebtext2_data(config):
 
     train_data = np.memmap(os.path.join(OWT2_DATA_PATH, 'train.bin'), dtype=np.uint16, mode='r')
     val_data = np.memmap(os.path.join(OWT2_DATA_PATH, 'val.bin'), dtype=np.uint16, mode='r')
-    test_data = np.memmap(os.path.join(OWT2_DATA_PATH, 'test.bin'), dtype=np.uint16, mode='r')
+    # test_data = np.memmap(os.path.join(OWT2_DATA_PATH, 'test.bin'), dtype=np.uint16, mode='r')
 
-    return {'train': train_data, 'val': val_data, 'test': test_data}
+    # return {'train': train_data, 'val': val_data, 'test': test_data}
+    return {'train': train_data, 'val': val_data}
