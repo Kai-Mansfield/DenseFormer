@@ -309,6 +309,27 @@ class DenseFormer(nn.Module):
         if torch.isnan(idx).any():
             print(f"NaNs found after idx")
 
+        vocab_size = self.config.vocab_size
+
+        # Case 1: idx is supposed to be int tensor
+        if not torch.is_floating_point(idx):
+
+            # Check for invalid integer token IDs
+            if (idx < 0).any():
+                print("Invalid token: negative ID detected in idx")
+
+            if (idx >= vocab_size).any():
+                print("Invalid token: ID >= vocab size detected in idx")
+
+        # Case 2: idx somehow became float (this is a bug upstream)
+        else:
+            # Now NaNs / infs are actually possible
+            if torch.isnan(idx).any():
+                print("NaN detected in float idx (unexpected!)")
+
+            if torch.isinf(idx).any():
+                print("Inf detected in float idx (unexpected!)")
+
         tok_emb = self.transformer.wte(idx) # token embeddings of shape (b, t, n_embd)
         if torch.isnan(tok_emb).any():
             print(f"NaNs found after tok emb at iter {iter}")
