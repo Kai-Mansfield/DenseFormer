@@ -311,7 +311,7 @@ class DenseFormer(nn.Module):
 
         tok_emb = self.transformer.wte(idx) # token embeddings of shape (b, t, n_embd)
         if torch.isnan(tok_emb).any():
-            print(f"NaNs found after tok emb")
+            print(f"NaNs found after tok emb at iter {iter}")
 
         x = pos_emb_closure.adapt_model_input(tok_emb, start_index=index_shift)
         if torch.isnan(x).any():
