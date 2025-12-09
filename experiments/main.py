@@ -242,6 +242,14 @@ def main(args):
             print("Restoring scheduler state...")
             scheduler.load_state_dict(checkpoint['scheduler'])
 
+        wte_weight = model.transformer.wte.weight.data
+
+        if torch.isnan(wte_weight).any():
+            print(f"NaNs found inside wte.weight at iter {iter} in main")
+
+        if torch.isinf(wte_weight).any():
+            print(f"Infs found inside wte.weight at iter {iter} in main")
+
         # === OVERRIDE LR ===
         # if args.lr is not None:
         #     print(f"Overriding checkpoint LR with {args.lr:.2e}")
