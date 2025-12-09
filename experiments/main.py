@@ -242,6 +242,8 @@ def main(args):
             print("Restoring scheduler state...")
             scheduler.load_state_dict(checkpoint['scheduler'])
 
+        print(model.transformer.wte.weight.dtype)
+
         wte_weight = model.transformer.wte.weight.data
 
         if torch.isnan(wte_weight).any():
