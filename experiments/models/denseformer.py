@@ -246,6 +246,15 @@ class DenseFormer(nn.Module):
 
         self.transformer["wte"]  = safe_move(self.transformer["wte"], "cuda:0")
 
+        print("Checking wte.weight right after safe_move...")
+
+        wte_weight = self.transformer["wte"].weight.data
+
+        if torch.isnan(wte_weight).any():
+            print("NaNs in wte.weight after safe_move()")
+        else:
+            print("No NaNs in wte.weight after safe_move()")
+
         wte_weight = self.transformer.wte.weight.data
 
         if torch.isnan(wte_weight).any():
