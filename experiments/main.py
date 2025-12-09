@@ -256,7 +256,7 @@ def main(args):
         print("sha256:", h.hexdigest())
 
         # load checkpoint metadata-safe on CPU
-        ckpt = torch.load(str(ckpt_path), map_location="cpu")
+        ckpt = torch.load(str(ckpt_path), map_location=args.device)
 
         def scan_obj(obj, prefix=""):
             # Recursively scan nested dicts / lists for tensors
