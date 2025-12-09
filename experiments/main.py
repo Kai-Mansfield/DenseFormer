@@ -15,6 +15,8 @@ torch._dynamo.config.suppress_errors = True
 import logging
 logging.getLogger("torch").setLevel(logging.ERROR)
 import math
+import torch, hashlib
+from pathlib import Path
 
 import config
 import models
@@ -243,9 +245,6 @@ def main(args):
             scheduler.load_state_dict(checkpoint['scheduler'])
 
         print(model.transformer.wte.weight.dtype)
-
-        import torch, hashlib
-        from pathlib import Path
 
         ckpt_path = Path(args.use_pretrained)  # or explicit path
 
