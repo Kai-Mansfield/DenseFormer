@@ -229,7 +229,7 @@ def main(args):
     resume_iter = 0
     if args.use_pretrained and args.use_pretrained != "none":
         print(f"Loading checkpoint from {args.use_pretrained}")
-        checkpoint = torch.load(args.use_pretrained, map_location=args.device)
+        checkpoint = torch.load(args.use_pretrained, map_location='cpu')
 
         # Load model weights
         state_dict = checkpoint.get('model', checkpoint)
@@ -256,7 +256,7 @@ def main(args):
         print("sha256:", h.hexdigest())
 
         # load checkpoint metadata-safe on CPU
-        ckpt = torch.load(str(ckpt_path), map_location=args.device)
+        ckpt = torch.load(str(ckpt_path), map_location='cpu')
 
         def scan_obj(obj, prefix=""):
             # Recursively scan nested dicts / lists for tensors
