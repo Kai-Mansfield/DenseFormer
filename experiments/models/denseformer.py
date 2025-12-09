@@ -235,6 +235,13 @@ class DenseFormer(nn.Module):
         if torch.isinf(wte_weight).any():
             print(f"Infs found inside wte.weight at iter {iter} before safe move")
 
+        print("Checking wte right before safe move")
+        for name, p in model.named_parameters():
+            if torch.isnan(p).any():
+                print(f"NaNs in {name} immediately after init, shape={tuple(p.shape)}, device={p.device}, dtype={p.dtype}")
+            else:
+                print('no nans')
+
         self.transformer["wte"]  = safe_move(self.transformer["wte"], "cuda:0")
 
         wte_weight = self.transformer.wte.weight.data
