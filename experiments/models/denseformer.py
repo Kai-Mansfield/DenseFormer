@@ -308,8 +308,6 @@ class DenseFormer(nn.Module):
             idx, pos_emb_closure = self.transformer.wpe(idx) # position embeddings of shape (1, t, n_embd)
         if torch.isnan(idx).any():
             print(f"NaNs found after idx")
-        if torch.isnan(pos_emb_closure).any():
-            print(f"NaNs found after pos emb")
 
         tok_emb = self.transformer.wte(idx) # token embeddings of shape (b, t, n_embd)
         if torch.isnan(tok_emb).any():
