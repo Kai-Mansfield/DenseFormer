@@ -225,6 +225,11 @@ def main(args):
 
     scheduler = make_scheduler(opt)
 
+    print("Checking model right after __init__...")
+    for name, p in model.named_parameters():
+        if torch.isnan(p).any():
+            print(f"NaNs in {name} immediately after init, shape={tuple(p.shape)}, device={p.device}, dtype={p.dtype}")
+
     # === Load checkpoint if specified ===
     resume_iter = 0
     if args.use_pretrained and args.use_pretrained != "none":
