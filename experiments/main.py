@@ -227,7 +227,7 @@ def main(args):
     resume_iter = 0
     if args.use_pretrained and args.use_pretrained != "none":
         print(f"Loading checkpoint from {args.use_pretrained}")
-        checkpoint = torch.load(args.use_pretrained, map_location='cpu')
+        checkpoint = torch.load(args.use_pretrained, map_location=args.device)
 
         # Load model weights
         state_dict = checkpoint.get('model', checkpoint)
@@ -243,6 +243,40 @@ def main(args):
             scheduler.load_state_dict(checkpoint['scheduler'])
 
         print(model.transformer.wte.weight.dtype)
+
+        import torch, hashlib
+        from pathlib import Path
+
+        ckpt_path = Path(args.use_pretrained)  # or explicit path
+
+        # compute checksum
+        h = hashlib.sha256()
+        with ckpt_path.open("rb") as f:
+            for chunk in iter(lambda: f.read(1<<20), b""):
+                h.update(chunk)
+        print("sha256:", h.hexdigest())
+
+        # load checkpoint metadata-safe on CPU
+        ckpt = torch.load(str(ckpt_path), map_location="cpu")
+
+        def scan_obj(obj, prefix=""):
+            # Recursively scan nested dicts / lists for tensors
+            if isinstance(obj, dict):
+                for k, v in obj.items():
+                    scan_obj(v, prefix + f"{k}.")
+            elif isinstance(obj, (list, tuple)):
+                for i, v in enumerate(obj):
+                    scan_obj(v, prefix + f"{i}.")
+            elif torch.is_tensor(obj):
+                t = obj
+                # only meaningful for floating tensors
+                if torch.is_floating_point(t):
+                    if torch.isnan(t).any():
+                        print(f"NaN in tensor: {prefix} shape={tuple(t.shape)} dtype={t.dtype}")
+                    if torch.isinf(t).any():
+                        print(f"Inf in tensor: {prefix} shape={tuple(t.shape)} dtype={t.dtype}")
+
+        scan_obj(ckpt)
 
         wte_weight = model.transformer.wte.weight.data
 
