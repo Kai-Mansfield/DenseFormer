@@ -227,6 +227,14 @@ class DenseFormer(nn.Module):
 
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
 
+        wte_weight = self.transformer.wte.weight.data
+
+        if torch.isnan(wte_weight).any():
+            print(f"NaNs found inside wte.weight at iter {iter} before safe move")
+
+        if torch.isinf(wte_weight).any():
+            print(f"Infs found inside wte.weight at iter {iter} before safe move")
+
         self.transformer["wte"]  = safe_move(self.transformer["wte"], "cuda:0")
         self.transformer["wpe"] = safe_move(self.transformer["wpe"], "cuda:0")
         self.transformer["drop"] = safe_move(self.transformer["drop"], "cuda:0")
