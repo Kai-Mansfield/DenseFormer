@@ -330,6 +330,15 @@ class DenseFormer(nn.Module):
             if torch.isinf(idx).any():
                 print("Inf detected in float idx (unexpected!)")
 
+        # Check embedding table for corruption
+        wte_weight = self.transformer.wte.weight.data
+
+        if torch.isnan(wte_weight).any():
+            print(f"NaNs found inside wte.weight at iter {iter}")
+
+        if torch.isinf(wte_weight).any():
+            print(f"Infs found inside wte.weight at iter {iter}")
+
         tok_emb = self.transformer.wte(idx) # token embeddings of shape (b, t, n_embd)
         if torch.isnan(tok_emb).any():
             print(f"NaNs found after tok emb at iter {iter}")
