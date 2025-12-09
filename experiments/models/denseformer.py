@@ -24,6 +24,25 @@ from torch.nn import functional as F
 
 from . import positional_encoders, caches
 
+def _param_stats(tensor):
+    # returns a small diagnostic dict; uses safe CPU copies for sums
+    if tensor is None:
+        return {"any_nan": None}
+    any_nan = bool(torch.isnan(tensor).any())
+    any_inf = bool(torch.isinf(tensor).any())
+    # compute a stable float64 sum for small signal of change
+    try:
+        s = float(tensor.detach().cpu().double().sum().item())
+        m = float(tensor.detach().cpu().double().mean().item())
+    except Exception:
+        s = None
+        m = None
+    return {"any_nan": any_nan, "any_inf": any_inf, "sum64": s, "mean64": m, "shape": tuple(tensor.shape), "dtype": tensor.dtype}
+
+def _print_snapshot(tag, name, tensor):
+    st = _param_stats(tensor)
+    print(f"[SNAPSHOT] {tag} {name}: nan={st['any_nan']} inf={st['any_inf']} sum64={st['sum64']} mean64={st['mean64']} shape={st['shape']} dtype={st['dtype']}")
+
 def safe_move(x, device, *, context="forward"):
     if isinstance(x, torch.nn.Module):
         return x.to(device)
@@ -326,10 +345,25 @@ class DenseFormer(nn.Module):
         b, t = idx.size()
         assert t <= self.config.sequence_length, f"Cannot forward sequence of length {t}, block size is only {self.config.sequence_length}"
         
+        if hasattr(self, "transformer"):
+            tr = self.transformer
+            pre = getattr(tr, "_forward_pre_hooks", {})
+            post = getattr(tr, "_forward_hooks", {})
+            if pre:
+                print("[HOOKS] transformer._forward_pre_hooks:", pre.keys())
+            if post:
+                print("[HOOKS] transformer._forward_hooks:", post.keys())
+
+        # snapshot BEFORE any work
+        _print_snapshot("BEFORE_FORWARD", "wte.weight", self.transformer.wte.weight.data)
         
         # forward the GPT model itself
         if use_cache:
+            # snapshot before lm_cache
+            _print_snapshot("BEFORE_CALL", "lm_cache", self.transformer.wte.weight.data)
             idx, index_shift, cache_context = self.lm_cache(idx)
+            # snapshot after lm_cache
+            _print_snapshot("AFTER_CALL", "lm_cache", self.transformer.wte.weight.data)
         else:
             index_shift = 0
             cache_context = None
@@ -337,10 +371,13 @@ class DenseFormer(nn.Module):
         if torch.isnan(idx).any():
             print(f"NaNs found after idx")
 
+        _print_snapshot("BEFORE_CALL", "wpe", self.transformer.wte.weight.data)
         if getattr(self.transformer.wpe, "needs_iter", False):
-            idx, pos_emb_closure = self.transformer.wpe(idx, iter=iter) # position embeddings of shape (1, t, n_embd)
+            idx, pos_emb_closure = self.transformer.wpe(idx, iter=iter)
         else:
-            idx, pos_emb_closure = self.transformer.wpe(idx) # position embeddings of shape (1, t, n_embd)
+            idx, pos_emb_closure = self.transformer.wpe(idx)
+        # snapshot after wpe
+        _print_snapshot("AFTER_CALL", "wpe", self.transformer.wte.weight.data)
         if torch.isnan(idx).any():
             print(f"NaNs found after idx")
 
@@ -374,13 +411,29 @@ class DenseFormer(nn.Module):
         if torch.isinf(wte_weight).any():
             print(f"Infs found inside wte.weight at iter {iter}")
 
-        tok_emb = self.transformer.wte(idx) # token embeddings of shape (b, t, n_embd)
-        if torch.isnan(tok_emb).any():
-            print(f"NaNs found after tok emb at iter {iter}")
+        if pos_emb_closure is not None:
+            _print_snapshot("BEFORE_CALL", "pos_emb_closure.adapt_model_input", self.transformer.wte.weight.data)
+            # call adapt (but snapshot before and after)
+            tok_emb = self.transformer.wte(idx)  # we will still check before/after adapt in case adapt touches params
+            _print_snapshot("AFTER_CALL", "wte_lookup", self.transformer.wte.weight.data)
+            # now actually adapt model input (if it writes any params internally)
+            try:
+                x = pos_emb_closure.adapt_model_input(tok_emb, start_index=index_shift)
+            except Exception as e:
+                print("Exception during adapt_model_input:", e)
+                raise
+            _print_snapshot("AFTER_CALL", "pos_emb_closure.adapt_model_input", self.transformer.wte.weight.data)
+        else:
+            # no closure; do the normal embedding lookup
+            _print_snapshot("BEFORE_CALL", "wte_lookup", self.transformer.wte.weight.data)
+            tok_emb = self.transformer.wte(idx)
+            _print_snapshot("AFTER_CALL", "wte_lookup", self.transformer.wte.weight.data)
+            x = tok_emb
 
-        x = pos_emb_closure.adapt_model_input(tok_emb, start_index=index_shift)
-        if torch.isnan(x).any():
-            print(f"NaNs found after pos_emb_closure.adapt_model_input(tok_emb, start_index=index_shift)")
+        for name, p in self.named_parameters():
+            if torch.isnan(p.data).any():
+                print(f"[FIRST_NAN] parameter {name} is NaN after initial operations; stopping. shape={tuple(p.shape)} device={p.device}")
+                break
 
         x = self.transformer.drop(x)
         if torch.isnan(x).any():
