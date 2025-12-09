@@ -227,7 +227,7 @@ def main(args):
     resume_iter = 0
     if args.use_pretrained and args.use_pretrained != "none":
         print(f"Loading checkpoint from {args.use_pretrained}")
-        checkpoint = torch.load(args.use_pretrained, map_location=args.device)
+        checkpoint = torch.load(args.use_pretrained, map_location='cpu')
 
         # Load model weights
         state_dict = checkpoint.get('model', checkpoint)
