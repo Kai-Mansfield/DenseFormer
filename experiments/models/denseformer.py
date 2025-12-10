@@ -254,25 +254,17 @@ class DenseFormer(nn.Module):
         if torch.isinf(wte_weight).any():
             print(f"Infs found inside wte.weight at iter {iter} before safe move")
 
-        print("Checking wte.weight right before safe_move...")
-
         wte_weight = self.transformer["wte"].weight.data
 
         if torch.isnan(wte_weight).any():
             print("NaNs in wte.weight BEFORE safe_move()")
-        else:
-            print("No NaNs in wte.weight BEFORE safe_move()")
 
         self.transformer["wte"]  = safe_move(self.transformer["wte"], "cuda:0")
-
-        print("Checking wte.weight right after safe_move...")
 
         wte_weight = self.transformer["wte"].weight.data
 
         if torch.isnan(wte_weight).any():
             print("NaNs in wte.weight after safe_move()")
-        else:
-            print("No NaNs in wte.weight after safe_move()")
 
         wte_weight = self.transformer.wte.weight.data
 
@@ -345,25 +337,9 @@ class DenseFormer(nn.Module):
         b, t = idx.size()
         assert t <= self.config.sequence_length, f"Cannot forward sequence of length {t}, block size is only {self.config.sequence_length}"
         
-        if hasattr(self, "transformer"):
-            tr = self.transformer
-            pre = getattr(tr, "_forward_pre_hooks", {})
-            post = getattr(tr, "_forward_hooks", {})
-            if pre:
-                print("[HOOKS] transformer._forward_pre_hooks:", pre.keys())
-            if post:
-                print("[HOOKS] transformer._forward_hooks:", post.keys())
-
-        # snapshot BEFORE any work
-        _print_snapshot("BEFORE_FORWARD", "wte.weight", self.transformer.wte.weight.data)
-        
         # forward the GPT model itself
         if use_cache:
-            # snapshot before lm_cache
-            _print_snapshot("BEFORE_CALL", "lm_cache", self.transformer.wte.weight.data)
             idx, index_shift, cache_context = self.lm_cache(idx)
-            # snapshot after lm_cache
-            _print_snapshot("AFTER_CALL", "lm_cache", self.transformer.wte.weight.data)
         else:
             index_shift = 0
             cache_context = None
@@ -371,13 +347,10 @@ class DenseFormer(nn.Module):
         if torch.isnan(idx).any():
             print(f"NaNs found after idx")
 
-        _print_snapshot("BEFORE_CALL", "wpe", self.transformer.wte.weight.data)
         if getattr(self.transformer.wpe, "needs_iter", False):
             idx, pos_emb_closure = self.transformer.wpe(idx, iter=iter)
         else:
             idx, pos_emb_closure = self.transformer.wpe(idx)
-        # snapshot after wpe
-        _print_snapshot("AFTER_CALL", "wpe", self.transformer.wte.weight.data)
         if torch.isnan(idx).any():
             print(f"NaNs found after idx")
 
@@ -412,22 +385,16 @@ class DenseFormer(nn.Module):
             print(f"Infs found inside wte.weight at iter {iter}")
 
         if pos_emb_closure is not None:
-            _print_snapshot("BEFORE_CALL", "pos_emb_closure.adapt_model_input", self.transformer.wte.weight.data)
             # call adapt (but snapshot before and after)
-            tok_emb = self.transformer.wte(idx)  # we will still check before/after adapt in case adapt touches params
-            _print_snapshot("AFTER_CALL", "wte_lookup", self.transformer.wte.weight.data)
+            tok_emb = self.transformer.wte(idx)  
             # now actually adapt model input (if it writes any params internally)
             try:
                 x = pos_emb_closure.adapt_model_input(tok_emb, start_index=index_shift)
             except Exception as e:
                 print("Exception during adapt_model_input:", e)
                 raise
-            _print_snapshot("AFTER_CALL", "pos_emb_closure.adapt_model_input", self.transformer.wte.weight.data)
         else:
-            # no closure; do the normal embedding lookup
-            _print_snapshot("BEFORE_CALL", "wte_lookup", self.transformer.wte.weight.data)
             tok_emb = self.transformer.wte(idx)
-            _print_snapshot("AFTER_CALL", "wte_lookup", self.transformer.wte.weight.data)
             x = tok_emb
 
         for name, p in self.named_parameters():

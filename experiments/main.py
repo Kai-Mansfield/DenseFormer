@@ -224,8 +224,6 @@ def main(args):
         raise NotImplementedError(f"Unknown scheduler: {args.scheduler}")
 
     scheduler = make_scheduler(opt)
-
-    print("Checking model right after __init__...")
     for name, p in model.named_parameters():
         if torch.isnan(p).any():
             print(f"NaNs in {name} immediately after init, shape={tuple(p.shape)}, device={p.device}, dtype={p.dtype}")
@@ -243,10 +241,8 @@ def main(args):
 
         # Restore optimizer + scheduler
         if 'optimizer' in checkpoint:
-            print("Restoring optimizer state...")
             opt.load_state_dict(checkpoint['optimizer'])
         if 'scheduler' in checkpoint and scheduler is not None:
-            print("Restoring scheduler state...")
             scheduler.load_state_dict(checkpoint['scheduler'])
 
         print(model.transformer.wte.weight.dtype)

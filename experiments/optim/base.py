@@ -28,69 +28,6 @@ from .utils import eval, get_batch, save_checkpoint
 import torch
 import torch.nn as nn
 
-def add_nan_hooks(model):
-
-    printed = set()  # track printed modules so we print only once
-
-    def pre_hook(mod, inp):
-        name = mod.__class__.__name__
-        if name in printed:
-            return
-
-        for i, x in enumerate(inp):
-            if torch.is_tensor(x) and torch.isnan(x).any():
-                print(f"[NAN PRE] {mod.__class__.__name__} before forward, input #{i}, "
-                      f"shape={tuple(x.shape)}, dtype={x.dtype}")
-                printed.add(name)
-
-    def post_hook(mod, inp, out):
-        name = mod.__class__.__name__
-        if name in printed:
-            return
-
-        # Output can be tensor or tuple of tensors
-        def check(t):
-            if torch.is_tensor(t) and torch.isnan(t).any():
-                print(f"[NAN POST] {mod.__class__.__name__} produced NaN output, "
-                      f"shape={tuple(t.shape)}, dtype={t.dtype}")
-                printed.add(name)
-
-        if torch.is_tensor(out):
-            check(out)
-        elif isinstance(out, (tuple, list)):
-            for t in out:
-                check(t)
-        elif isinstance(out, dict):
-            for t in out.values():
-                check(t)
-
-    # Register hooks on all modules
-    for name, module in model.named_modules():
-        module.register_forward_pre_hook(pre_hook)
-        module.register_forward_hook(post_hook)
-
-    print("=== NaN hooks installed on all modules ===")
-    return model
-
-def _param_stats(tensor):
-    # returns a small diagnostic dict; uses safe CPU copies for sums
-    if tensor is None:
-        return {"any_nan": None}
-    any_nan = bool(torch.isnan(tensor).any())
-    any_inf = bool(torch.isinf(tensor).any())
-    # compute a stable float64 sum for small signal of change
-    try:
-        s = float(tensor.detach().cpu().double().sum().item())
-        m = float(tensor.detach().cpu().double().mean().item())
-    except Exception:
-        s = None
-        m = None
-    return {"any_nan": any_nan, "any_inf": any_inf, "sum64": s, "mean64": m, "shape": tuple(tensor.shape), "dtype": tensor.dtype}
-
-def _print_snapshot(tag, name, tensor):
-    st = _param_stats(tensor)
-    print(f"[SNAPSHOT] {tag} {name}: nan={st['any_nan']} inf={st['any_inf']} sum64={st['sum64']} mean64={st['mean64']} shape={st['shape']} dtype={st['dtype']}")
-
 def grad_norm(model):
     total_norm = 0.0
     for p in model.parameters():
@@ -98,120 +35,6 @@ def grad_norm(model):
             param_norm = p.grad.data.norm(2)
             total_norm += param_norm.item() ** 2
     return total_norm ** 0.5
-
-def verify_group_lrs_and_updates(model, opt, max_items=1):
-    """
-    For each optimizer param_group, pick up to `max_items` params that actually belong
-    to that group (auto-detected), then report lr, initial_lr, and Adam internal stats.
-    Call this AFTER at least one backward+opt.step() so optimizer state exists.
-    """
-
-    named = dict(model.named_parameters())   # map name -> tensor
-
-    # Build reverse map for fast identity lookup: tensor -> name
-    tensor_to_name = {param: name for name, param in named.items()}
-
-    print("\n=== VERIFY PER-GROUP LR & UPDATE (auto-detected) ===")
-
-    for gi, g in enumerate(opt.param_groups):
-        print(f"\n--- Group {gi} ---")
-        # print hyperparams
-        for k, v in g.items():
-            if k == "params": 
-                continue
-            print(f"  {k}: {v}")
-
-        # Find up to max_items parameters that belong to this group
-        found = []
-        for candidate in g["params"]:
-            # candidate may be a tensor or name; ensure we compare by identity
-            # find a matching named parameter by identity
-            name = None
-            # fast-path: if candidate is a tensor that appears in named params
-            if candidate in tensor_to_name:
-                name = tensor_to_name[candidate]
-                p = candidate
-            else:
-                # sometimes group["params"] contains names (strings) — handle that
-                if isinstance(candidate, str) and candidate in named:
-                    name = candidate
-                    p = named[candidate]
-                else:
-                    # fallback: try to find by identity via iteration (safe but slower)
-                    # (this avoids elementwise comparison that causes shape errors)
-                    p = None
-                    for n, param in model.named_parameters():
-                        if candidate is param:
-                            name = n
-                            p = param
-                            break
-
-            if name is None:
-                # skip if we couldn't resolve identity
-                continue
-
-            found.append((name, p))
-            if len(found) >= max_items:
-                break
-
-        if not found:
-            print("  ❌ No resolved params found in this group (unexpected).")
-            continue
-
-        for name, p in found:
-            print(f"  param: {name} shape={tuple(p.shape)}")
-
-            # locate optimizer state for this param — use identity-safe key
-            if p not in opt.state or "exp_avg" not in opt.state[p]:
-                print("    ⚠️ optimizer state not initialized for this param. Run at least one step.")
-                continue
-
-            st = opt.state[p]
-            grad = p.grad
-
-            if grad is None:
-                print("    ⚠️ grad is None for this param (maybe not used this step).")
-                continue
-
-            # check for NaN / Inf
-            grad_finite = torch.isfinite(grad).all().item()
-            if not grad_finite:
-                print("    ❌ grad contains NaN/Inf")
-                # print a small subset diagnostic
-                print("    grad stats: min, max, mean =",
-                      float(torch.nanmin(grad)), float(torch.nanmax(grad)), float(torch.nanmean(grad)))
-                continue
-
-            exp_avg = st.get("exp_avg", None)
-            exp_avg_sq = st.get("exp_avg_sq", None)
-            if exp_avg is None or exp_avg_sq is None:
-                print("    ⚠️ missing exp_avg/exp_avg_sq in optimizer state.")
-                continue
-
-            # compute Adam-style step magnitude (matching fused/unfused's math approximately)
-            eps = opt.defaults.get("eps", 1e-8)
-            denom = exp_avg_sq.sqrt().add(eps)   # keep non-inplace
-            adam_step = exp_avg / denom
-            lr = g.get("lr", None)
-            initial_lr = g.get("initial_lr", None)
-
-            # safe norms
-            try:
-                grad_norm = float(grad.norm().item())
-                exp_avg_norm = float(exp_avg.norm().item())
-                exp_avg_sq_norm = float(exp_avg_sq.norm().item())
-                update_norm = float((adam_step * (lr if lr is not None else 1.0)).norm().item())
-            except Exception as e:
-                print("    ❌ Error computing norms:", e)
-                continue
-
-            print(f"    lr = {lr}, initial_lr = {initial_lr}")
-            print(f"    grad norm       = {grad_norm:.6e}")
-            print(f"    exp_avg norm    = {exp_avg_norm:.6e}")
-            print(f"    exp_avg_sq norm = {exp_avg_sq_norm:.6e}")
-            print(f"    computed update norm (lr * adam_step) = {update_norm:.6e}")
-
-    print("=== END VERIFY ===\n")
 
 def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, sequence_length, eval_freq, ckpt_path, distributed_backend, extra_args, srt_iter=0):
     device_type = 'cuda' if 'cuda' in str(extra_args.device) else 'cpu'
@@ -225,8 +48,6 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
 
     running_layer_grad_sum = {}
     running_layer_grad_count = {}
-
-    add_nan_hooks(model)
     
     if not extra_args.no_compile:
         print(f"Compiling model ...")
@@ -260,7 +81,6 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
 
             loss = outputs['loss']
             loss.backward()
-            _print_snapshot("AFTER_BACKWARD", "wte.grad", model.transformer.wte.weight.grad)
             substep += 1
 
         # # ---- TOP LAYERS ----
@@ -294,11 +114,7 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
         if extra_args.grad_clip != 0.0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), extra_args.grad_clip)
 
-        _print_snapshot("BEFORE_OPT_STEP", "wte.weight", model.transformer.wte.weight.data)
-
         opt.step()
-
-        _print_snapshot("AFTER_OPT_STEP", "wte.weight", model.transformer.wte.weight.data)
 
         if hasattr(scheduler, 'total_steps'):
             max_steps = scheduler.total_steps
