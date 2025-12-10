@@ -25,6 +25,25 @@ import math
 
 from .utils import eval, get_batch, save_checkpoint
 
+def _param_stats(tensor):
+    # returns a small diagnostic dict; uses safe CPU copies for sums
+    if tensor is None:
+        return {"any_nan": None}
+    any_nan = bool(torch.isnan(tensor).any())
+    any_inf = bool(torch.isinf(tensor).any())
+    # compute a stable float64 sum for small signal of change
+    try:
+        s = float(tensor.detach().cpu().double().sum().item())
+        m = float(tensor.detach().cpu().double().mean().item())
+    except Exception:
+        s = None
+        m = None
+    return {"any_nan": any_nan, "any_inf": any_inf, "sum64": s, "mean64": m, "shape": tuple(tensor.shape), "dtype": tensor.dtype}
+
+def _print_snapshot(tag, name, tensor):
+    st = _param_stats(tensor)
+    print(f"[SNAPSHOT] {tag} {name}: nan={st['any_nan']} inf={st['any_inf']} sum64={st['sum64']} mean64={st['mean64']} shape={st['shape']} dtype={st['dtype']}")
+
 def grad_norm(model):
     total_norm = 0.0
     for p in model.parameters():
@@ -192,6 +211,7 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
 
             loss = outputs['loss']
             loss.backward()
+            _print_snapshot("AFTER_BACKWARD", "wte.grad", model.transformer.wte.weight.grad)
             substep += 1
 
         # # ---- TOP LAYERS ----
@@ -225,7 +245,11 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
         if extra_args.grad_clip != 0.0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), extra_args.grad_clip)
 
+        _print_snapshot("BEFORE_OPT_STEP", "wte.weight", model.transformer.wte.weight.data)
+
         opt.step()
+
+        _print_snapshot("AFTER_OPT_STEP", "wte.weight", model.transformer.wte.weight.data)
 
         if hasattr(scheduler, 'total_steps'):
             max_steps = scheduler.total_steps
