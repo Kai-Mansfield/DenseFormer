@@ -127,10 +127,6 @@ def main(args):
     use_fused = (device_type == 'cuda') and ('fused' in inspect.signature(torch.optim.AdamW).parameters)
     print(f"Using fused AdamW: {use_fused}")
 
-    for name, p in model.named_parameters():
-        if not p.is_floating_point() or p.device.type != "cuda":
-            print("BAD PARAM:", name, p.dtype, p.device)
-
     if args.opt == 'adamw':
         extra_args = dict(fused=True) if use_fused else {}
         opt = torch.optim.AdamW(
@@ -225,11 +221,6 @@ def main(args):
 
     scheduler = make_scheduler(opt)
 
-    print("Checking model right after __init__...")
-    for name, p in model.named_parameters():
-        if torch.isnan(p).any():
-            print(f"NaNs in {name} immediately after init, shape={tuple(p.shape)}, device={p.device}, dtype={p.dtype}")
-
     # === Load checkpoint if specified ===
     resume_iter = 0
     if args.use_pretrained and args.use_pretrained != "none":
@@ -248,8 +239,6 @@ def main(args):
         if 'scheduler' in checkpoint and scheduler is not None:
             print("Restoring scheduler state...")
             scheduler.load_state_dict(checkpoint['scheduler'])
-
-        print(model.transformer.wte.weight.dtype)
 
         ckpt_path = Path(args.use_pretrained)  # or explicit path
 
@@ -281,14 +270,6 @@ def main(args):
                         print(f"Inf in tensor: {prefix} shape={tuple(t.shape)} dtype={t.dtype}")
 
         scan_obj(ckpt)
-
-        wte_weight = model.transformer.wte.weight.data
-
-        if torch.isnan(wte_weight).any():
-            print(f"NaNs found inside wte.weight at iter {iter} in main")
-
-        if torch.isinf(wte_weight).any():
-            print(f"Infs found inside wte.weight at iter {iter} in main")
 
         # === OVERRIDE LR ===
         # if args.lr is not None:
