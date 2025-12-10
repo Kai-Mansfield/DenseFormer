@@ -25,6 +25,53 @@ import math
 
 from .utils import eval, get_batch, save_checkpoint
 
+import torch
+import torch.nn as nn
+
+def add_nan_hooks(model):
+
+    printed = set()  # track printed modules so we print only once
+
+    def pre_hook(mod, inp):
+        name = mod.__class__.__name__
+        if name in printed:
+            return
+
+        for i, x in enumerate(inp):
+            if torch.is_tensor(x) and torch.isnan(x).any():
+                print(f"[NAN PRE] {mod.__class__.__name__} before forward, input #{i}, "
+                      f"shape={tuple(x.shape)}, dtype={x.dtype}")
+                printed.add(name)
+
+    def post_hook(mod, inp, out):
+        name = mod.__class__.__name__
+        if name in printed:
+            return
+
+        # Output can be tensor or tuple of tensors
+        def check(t):
+            if torch.is_tensor(t) and torch.isnan(t).any():
+                print(f"[NAN POST] {mod.__class__.__name__} produced NaN output, "
+                      f"shape={tuple(t.shape)}, dtype={t.dtype}")
+                printed.add(name)
+
+        if torch.is_tensor(out):
+            check(out)
+        elif isinstance(out, (tuple, list)):
+            for t in out:
+                check(t)
+        elif isinstance(out, dict):
+            for t in out.values():
+                check(t)
+
+    # Register hooks on all modules
+    for name, module in model.named_modules():
+        module.register_forward_pre_hook(pre_hook)
+        module.register_forward_hook(post_hook)
+
+    print("=== NaN hooks installed on all modules ===")
+    return model
+
 def _param_stats(tensor):
     # returns a small diagnostic dict; uses safe CPU copies for sums
     if tensor is None:
@@ -178,6 +225,8 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
 
     running_layer_grad_sum = {}
     running_layer_grad_count = {}
+
+    add_nan_hooks(model)
     
     if not extra_args.no_compile:
         print(f"Compiling model ...")
