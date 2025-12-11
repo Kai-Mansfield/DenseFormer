@@ -28,48 +28,54 @@ from .utils import eval, get_batch, save_checkpoint
 import torch
 import torch.nn as nn
 
-def add_nan_hooks(model):
+def add_verbose_nan_hooks(model):
+    triggered = {"first": False}
 
-    printed = set()  # track printed modules so we print only once
+    def mk_pre(name):
+        def pre_hook(mod, inp):
+            if triggered["first"]:
+                return
+            # check every tensor input
+            for i, x in enumerate(inp):
+                if torch.is_tensor(x) and torch.isnan(x).any():
+                    print(f"[FIRST NAN FOUND - PRE] module={name} input#{i} shape={tuple(x.shape)} dtype={x.dtype}")
+                    # print small fingerprint
+                    try:
+                        cpu = x.detach().cpu()
+                        print("  fingerprint sum/mean:", float(cpu.double().sum()), float(cpu.double().mean()))
+                    except Exception:
+                        pass
+                    triggered["first"] = True
+                    # optionally raise to stop execution
+                    # raise RuntimeError(f"NaN detected in input to {name}")
+                    return
+        return pre_hook
 
-    def pre_hook(mod, inp):
-        name = mod.__class__.__name__
-        if name in printed:
-            return
+    def mk_post(name):
+        def post_hook(mod, inp, out):
+            if triggered["first"]:
+                return
+            # helper to check any tensor-like outputs
+            def check_tensor(t):
+                if torch.is_tensor(t) and torch.isnan(t).any():
+                    print(f"[FIRST NAN FOUND - POST] module={name} output shape={tuple(t.shape)} dtype={t.dtype}")
+                    triggered["first"] = True
 
-        for i, x in enumerate(inp):
-            if torch.is_tensor(x) and torch.isnan(x).any():
-                print(f"[NAN PRE] {mod.__class__.__name__} before forward, input #{i}, "
-                      f"shape={tuple(x.shape)}, dtype={x.dtype}")
-                printed.add(name)
+            if torch.is_tensor(out):
+                check_tensor(out)
+            elif isinstance(out, (tuple, list)):
+                for t in out:
+                    check_tensor(t)
+            elif isinstance(out, dict):
+                for t in out.values():
+                    check_tensor(t)
+        return post_hook
 
-    def post_hook(mod, inp, out):
-        name = mod.__class__.__name__
-        if name in printed:
-            return
-
-        # Output can be tensor or tuple of tensors
-        def check(t):
-            if torch.is_tensor(t) and torch.isnan(t).any():
-                print(f"[NAN POST] {mod.__class__.__name__} produced NaN output, "
-                      f"shape={tuple(t.shape)}, dtype={t.dtype}")
-                printed.add(name)
-
-        if torch.is_tensor(out):
-            check(out)
-        elif isinstance(out, (tuple, list)):
-            for t in out:
-                check(t)
-        elif isinstance(out, dict):
-            for t in out.values():
-                check(t)
-
-    # Register hooks on all modules
-    for name, module in model.named_modules():
-        module.register_forward_pre_hook(pre_hook)
-        module.register_forward_hook(post_hook)
-
-    print("=== NaN hooks installed on all modules ===")
+    for full_name, module in model.named_modules():
+        # skip the root module if you want, but include it for completeness
+        module.register_forward_pre_hook(mk_pre(full_name))
+        module.register_forward_hook(mk_post(full_name))
+    print("Verbose NaN hooks installed (reports full module names).")
     return model
 
 def _param_stats(tensor):
@@ -112,7 +118,7 @@ def train_base(model, opt, data, scheduler, iterations, acc_steps, batch_size, s
     running_layer_grad_sum = {}
     running_layer_grad_count = {}
 
-    add_nan_hooks(model)
+    add_verbose_nan_hooks(model)
     
     if not extra_args.no_compile:
         print(f"Compiling model ...")
