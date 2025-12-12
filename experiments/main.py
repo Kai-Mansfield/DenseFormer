@@ -18,6 +18,8 @@ import math
 import torch, hashlib
 from pathlib import Path
 
+torch.autograd.set_detect_anomaly(True)
+
 import config
 import models
 from data.utils import get_dataset, prepare_dataset
