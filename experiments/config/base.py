@@ -125,10 +125,21 @@ def parse_args(base_parser, args, namespace):
         exp_name += f"{args.model}_lr{args.lr}_bs{args.batch_size}x{args.acc_steps}_seqlen{args.sequence_length}/{overriden_values_str}_seed={args.seed}"
         args.exp_name = exp_name
 
-    if args.dtype == "torch.bfloat16":
-        args.dtype = torch.bfloat16
-    elif args.dtype == "torch.float16":
-        args.dtype = torch.float16
+    dtype_map = {
+        "torch.float32": torch.float32,
+        "float32": torch.float32,
+        "fp32": torch.float32,
+        "torch.float16": torch.float16,
+        "float16": torch.float16,
+        "fp16": torch.float16,
+        "torch.bfloat16": torch.bfloat16,
+        "bfloat16": torch.bfloat16,
+        "bf16": torch.bfloat16,
+    }
 
+    if isinstance(args.dtype, str):
+        if args.dtype not in dtype_map:
+            raise ValueError(f"Unknown dtype string: {args.dtype}")
+        args.dtype = dtype_map[args.dtype]
     
     return args
