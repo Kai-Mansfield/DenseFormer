@@ -302,7 +302,7 @@ def main(args):
         del params_copy['device']
         wandb.init(project=args.wandb_project, name=exp_name, config=params_copy)
 
-    ckpt_path = f"{args.results_base_folder}/{args.dataset}/{args.model}"
+    ckpt_path = f"{args.results_base_folder}/{args.dataset}/"
     if not os.path.exists(ckpt_path):
         if distributed_backend.is_master_process():
             os.makedirs(ckpt_path)
@@ -324,11 +324,7 @@ def main(args):
     args.device = None
     args.dtype = None
     stats['args'] = vars(args)
-    if distributed_backend.is_master_process():
-        with open(f"{ckpt_path}/summary.json", "w") as fs:
-            json.dump(stats, fs)
     distributed_backend.finalize()
-
 
 if __name__ == "__main__":
     args = get_args()
