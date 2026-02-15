@@ -337,6 +337,11 @@ class DenseFormer2(nn.Module):
             w = self.weights[rep_idx - 1].weight.view(-1)
             n = w.numel() // 2
             assert w.numel() == 2 * n, f"Expected {2 * n} weights, got {w.numel()}"
+
+            for i in range(n):
+                block_index = (rep_idx % self.dilation_factor) + i * self.dilation_factor
+                print(f"w[{i}] multiplies block output from rep_idx={block_index}")
+
             x_left = torch.tensordot(w[:n], x_left, dims=1)
             x_right = torch.tensordot(w[n:], x_right, dims=1)
             x = torch.cat([x_left, x_right], dim=-1) 
