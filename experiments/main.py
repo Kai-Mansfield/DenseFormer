@@ -65,7 +65,7 @@ def main(args):
     print(f"Using backend: {type(distributed_backend)}")
     args = distributed_backend.get_adjusted_args_for_process(args)
 
-    args.device = torch.device(f"cuda:{local_rank}")
+    args.device = torch.device(args.device)
     torch.cuda.set_device(args.device)
     device_type = 'cuda' if 'cuda' in str(args.device) else 'cpu'
     
@@ -97,7 +97,7 @@ def main(args):
     print(f"Num training tokens: {len(data['train'])}")
     print(f"Num validation tokens: {len(data['val'])}")
 
-    model = models.make_model_from_args(args)
+    model = models.make_model_from_args(args).to(args.device)
     model = distributed_backend.transform_model(model)
 
     if args.dlr is None:

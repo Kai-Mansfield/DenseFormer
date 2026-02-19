@@ -231,31 +231,12 @@ class GPTBase(nn.Module):
 
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
 
-        self.transformer["wte"]  = safe_move(self.transformer["wte"], "cuda:0")
-        self.transformer["wpe"] = safe_move(self.transformer["wpe"], "cuda:0")
-        self.transformer["drop"] = safe_move(self.transformer["drop"], "cuda:0")
-        
-        n_layer = config.n_layer
+        self.transformer["wte"]  = safe_move(self.transformer["wte"])
+        self.transformer["wpe"] = safe_move(self.transformer["wpe"])
+        self.transformer["drop"] = safe_move(self.transformer["drop"])
 
-        if n_layer <= 22:
-            # All go to cuda:1
-            self.n_cuda0 = 0
-        else:
-            # First 12 fixed on cuda:1
-            remaining = min(n_layer, 75) - 22
-            self.n_cuda0 = (remaining + 1) // 2  
-            self.n_cuda0 += max(0, n_layer - 75) 
-
-        # Now move layers
-        for i, block in enumerate(self.transformer["h"]):
-            if i < self.n_cuda0:
-                dev = "cuda:0"
-            else:
-                dev = "cuda:1"
-            self.transformer["h"][i] = safe_move(block, dev)
-
-        self.transformer["ln_f"] = safe_move(self.transformer["ln_f"], "cuda:1")
-        self.lm_head = safe_move(self.lm_head, "cuda:0")
+        self.transformer["ln_f"] = safe_move(self.transformer["ln_f"])
+        self.lm_head = safe_move(self.lm_head)
 
         self.transformer.wte.weight = self.lm_head.weight
 
@@ -290,6 +271,7 @@ class GPTBase(nn.Module):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
     def forward(self, idx, targets=None, get_logits=False, use_cache=False, iter=None):
+        device = idx.device
         b, t = idx.size()
         assert t <= self.config.sequence_length, f"Cannot forward sequence of length {t}, block size is only {self.config.sequence_length}"
 
@@ -315,8 +297,6 @@ class GPTBase(nn.Module):
             print(f"NaNs found after self.transformer.drop(x)")
 
         for i in range(0, self.config.n_layer):
-            if i == self.n_cuda0:
-                x = safe_move(x, "cuda:1")
             x = self.transformer.h[i](x, pos_emb_closure, cache_context, start_index=index_shift)
 
         x = self.transformer.ln_f(x)
@@ -328,7 +308,7 @@ class GPTBase(nn.Module):
         if torch.isnan(x).any():
             print(f"NaNs found after self.lm_cache.get_final_logits(x)")
 
-        x = safe_move(x, "cuda:0")
+        x = safe_move(x)
         if targets is not None:
             logits = self.lm_head(x)
             loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
@@ -438,6 +418,6 @@ class GPTBase(nn.Module):
     
     @torch.no_grad()
     def generate_from_string(self, in_str, max_new_tokens, temperature=1.0, top_k=None):
-        idx = safe_move(torch.tensor(self.tokenizer.encode(in_str, allowed_special={"<|endoftext|>"})).view(1,-1), self.lm_head.weight.device)
+        idx = torch.tensor(self.tokenizer.encode(in_str, allowed_special={"<|endoftext|>"})).view(1,-1).to(self.lm_head.weight.device)
         out_idx = self.generate(idx, max_new_tokens, temperature, top_k).view(-1).to('cpu').numpy()
         return self.tokenizer.decode(out_idx)

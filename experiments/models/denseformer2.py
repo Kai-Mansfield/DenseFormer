@@ -227,25 +227,9 @@ class DenseFormer2(nn.Module):
 
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
 
-        self.transformer["wte"]  = safe_move(self.transformer["wte"], "cuda:0")
-        self.transformer["wpe"] = safe_move(self.transformer["wpe"], "cuda:0")
-        self.transformer["drop"] = safe_move(self.transformer["drop"], "cuda:0")
-        
-        n_layer = config.n_layer
-
-        self.n_cuda0 = max(0, n_layer - 22) 
-
-        # Now move layers
-        for i, block in enumerate(self.transformer["h"]):
-            if i < self.n_cuda0:
-                dev = "cuda:0"
-            else:
-                dev = "cuda:1"
-            self.transformer["h"][i] = safe_move(block, dev)
-            self.weights[i] = safe_move(self.weights[i], dev)
-
-        self.transformer["ln_f"] = safe_move(self.transformer["ln_f"], "cuda:1")
-        self.lm_head = safe_move(self.lm_head, "cuda:0")
+        self.transformer["wte"]  = safe_move(self.transformer["wte"])
+        self.transformer["wpe"] = safe_move(self.transformer["wpe"])
+        self.transformer["drop"] = safe_move(self.transformer["drop"])
 
         self.transformer.wte.weight = self.lm_head.weight # https://paperswithcode.com/method/weight-tying
 
@@ -283,6 +267,7 @@ class DenseFormer2(nn.Module):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
     def forward(self, idx, targets=None, get_logits=False, use_cache=False, iter=None):
+        device = idx.device
         b, t = idx.size()
         assert t <= self.config.sequence_length, f"Cannot forward sequence of length {t}, block size is only {self.config.sequence_length}"
 
@@ -315,9 +300,6 @@ class DenseFormer2(nn.Module):
             x_accs.append((torch.zeros((current_group_size, *x.shape), device=x.device, dtype=x.dtype), None))
         x_accs[0] = apply_inplace_set(x_accs[0], 0, x)
         for rep_idx in range(1, self.n_repeat+1):
-            if rep_idx == 1 + self.n_cuda0:
-                x = safe_move(x, "cuda:1")
-                x_accs[rep_idx % self.dilation_factor] = (safe_move(x_accs[rep_idx % self.dilation_factor][0], 'cuda:1'), safe_move(x_accs[rep_idx % self.dilation_factor][1], 'cuda:1'))
             for block in self.transformer.h[rep_idx-1]:
                 x = block(x, pos_emb_closure, cache_context, start_index=index_shift)
             x_accs[rep_idx % self.dilation_factor] = apply_inplace_set(
@@ -338,10 +320,6 @@ class DenseFormer2(nn.Module):
             n = w.numel() // 2
             assert w.numel() == 2 * n, f"Expected {2 * n} weights, got {w.numel()}"
 
-            for i in range(n):
-                block_index = (rep_idx % self.dilation_factor) + i * self.dilation_factor
-                print(f"w[{i}] multiplies block output from rep_idx={block_index}")
-
             x_left = torch.tensordot(w[:n], x_left, dims=1)
             x_right = torch.tensordot(w[n:], x_right, dims=1)
             x = torch.cat([x_left, x_right], dim=-1) 
@@ -351,8 +329,7 @@ class DenseFormer2(nn.Module):
 
         if use_cache:
             x = self.lm_cache.get_final_logits(x)
-
-        x = safe_move(x, "cuda:0")
+            
         if targets is not None:
             logits = self.lm_head(x)
             loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
