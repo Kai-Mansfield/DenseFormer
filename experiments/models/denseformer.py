@@ -246,19 +246,6 @@ class DenseFormer(nn.Module):
 
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
 
-        self.transformer["wte"]  = safe_move(self.transformer["wte"])
-
-        wte_weight = self.transformer["wte"].weight.data
-
-        if torch.isnan(wte_weight).any():
-            print("NaNs in wte.weight after safe_move()")
-
-        self.transformer["wpe"] = safe_move(self.transformer["wpe"])
-        self.transformer["drop"] = safe_move(self.transformer["drop"])
-
-        self.transformer["ln_f"] = safe_move(self.transformer["ln_f"])
-        self.lm_head = safe_move(self.lm_head)
-
         # with weight tying when using torch.compile() some warnings get generated:
         # "UserWarning: functional_call was passed multiple values for tied weights.
         # This behavior is deprecated and will be an error in future versions"

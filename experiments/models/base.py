@@ -231,13 +231,6 @@ class GPTBase(nn.Module):
 
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
 
-        self.transformer["wte"]  = safe_move(self.transformer["wte"])
-        self.transformer["wpe"] = safe_move(self.transformer["wpe"])
-        self.transformer["drop"] = safe_move(self.transformer["drop"])
-
-        self.transformer["ln_f"] = safe_move(self.transformer["ln_f"])
-        self.lm_head = safe_move(self.lm_head)
-
         self.transformer.wte.weight = self.lm_head.weight
 
         # Initialize all weights
@@ -308,7 +301,6 @@ class GPTBase(nn.Module):
         if torch.isnan(x).any():
             print(f"NaNs found after self.lm_cache.get_final_logits(x)")
 
-        x = safe_move(x)
         if targets is not None:
             logits = self.lm_head(x)
             loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)

@@ -227,10 +227,6 @@ class DenseFormer2(nn.Module):
 
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
 
-        self.transformer["wte"]  = safe_move(self.transformer["wte"])
-        self.transformer["wpe"] = safe_move(self.transformer["wpe"])
-        self.transformer["drop"] = safe_move(self.transformer["drop"])
-
         self.transformer.wte.weight = self.lm_head.weight # https://paperswithcode.com/method/weight-tying
 
         # init all weights
@@ -329,7 +325,7 @@ class DenseFormer2(nn.Module):
 
         if use_cache:
             x = self.lm_cache.get_final_logits(x)
-            
+
         if targets is not None:
             logits = self.lm_head(x)
             loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
